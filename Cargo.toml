@@ -1,8 +1,11 @@
 [package]
 name = "ribozap"
 version = "0.1.0"
-edition = "2024"
-default-run = "ribozap"
+edition = "2021"
+
+[[bin]]
+name = "ribozap"
+path = "src/main.rs"
 
 [[bin]]
 name = "test_download"
