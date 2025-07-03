@@ -1,8 +1,8 @@
 [package]
-name = "untitled2"
+name = "ribozap"
 version = "0.1.0"
 edition = "2024"
-default-run = "untitled2"
+default-run = "ribozap"
 
 [[bin]]
 name = "test_download"

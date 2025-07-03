@@ -806,7 +806,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 )
                 .split(main_horizontal_split[0]);
 
-            let title = "DNA to Protein Sequence Converter";
+            let title = "Ribozap";
 
             let mut spans = Vec::new();
 
