@@ -7,10 +7,6 @@ edition = "2021"
 name = "ribozap"
 path = "src/main.rs"
 
-[[bin]]
-name = "test_download"
-path = "src/test_download.rs"
-
 [dependencies]
 crossterm = "0.29.0"
 ratatui = "0.24.0"
