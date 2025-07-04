@@ -9,7 +9,7 @@ use crossterm::{
 };
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
+    layout::{Alignment, Constraint, Direction, Layout},
     style::{Color, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
@@ -301,54 +301,70 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let start_codon_count = count_start_codons(&app.input);
                 let stop_codon_count = count_stop_codons(&app.input);
 
-                let amino_acid_length = calculate_amino_acid_length(&app.input);
-                let molecular_weight = estimate_molecular_weight(&app.input);
+                let aa_length = calculate_amino_acid_length(&app.input);
+                let mol_weight = estimate_molecular_weight(&app.input);
                 let hydrophobicity = calculate_hydrophobicity_index(&app.input);
-                let (positive_charges, negative_charges) = count_charged_residues(&app.input);
+                let (positive_residues, negative_residues) = count_charged_residues(&app.input);
                 let orf_count = count_orfs(&app.input);
 
                 let seq_comp_lines = vec![
                     Line::from(vec![
-                        Span::styled(format!("Length: {}", sequence_length), Style::default().fg(Color::White)),
+                        Span::styled("Sequence: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{} bp", sequence_length), Style::default().fg(Color::Green)),
                     ]),
                     Line::from(vec![
-                        Span::styled(format!("GC: {:.1}% | AT: {:.1}%", gc_content, at_content), Style::default().fg(Color::Green)),
-                    ]),
-                    Line::from(vec![
-                        Span::styled(format!("Purine: {:.1}% | Pyrimidine: {:.1}%", purine_content, pyrimidine_content), Style::default().fg(Color::Blue)),
+                        Span::styled("AT: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{:.1}%", at_content), Style::default().fg(Color::Red)),
+                        Span::raw("  "),
+                        Span::styled("GC: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{:.1}%", gc_content), Style::default().fg(Color::Blue)),
+                        Span::raw("  "),
+                        Span::styled("Pur: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{:.1}%", purine_content), Style::default().fg(Color::Yellow)),
+                        Span::raw("  "),
+                        Span::styled("Pyr: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{:.1}%", pyrimidine_content), Style::default().fg(Color::Magenta)),
                     ]),
                 ];
 
                 let codon_lines = vec![
                     Line::from(vec![
-                        Span::styled(format!("Total: {} | Complete: {}", total_codons, complete_codons), Style::default().fg(Color::White)),
+                        Span::styled("Codons: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{} total", total_codons), Style::default().fg(Color::Green)),
+                        Span::raw("  "),
+                        Span::styled(format!("{} complete", complete_codons), Style::default().fg(Color::Blue)),
+                        Span::raw("  "),
+                        Span::styled(format!("{} incomplete", incomplete_codons), Style::default().fg(Color::Yellow)),
                     ]),
                     Line::from(vec![
-                        Span::styled(format!("Incomplete: {}", incomplete_codons), Style::default().fg(Color::Gray)),
-                    ]),
-                    Line::from(vec![
-                        Span::styled(format!("Start: {} | Stop: {}", start_codon_count, stop_codon_count), Style::default().fg(Color::Yellow)),
-                    ]),
-                    Line::from(vec![
-                        Span::styled(format!("ORFs: {}", orf_count), Style::default().fg(Color::Magenta)),
+                        Span::styled("Start (ATG): ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{}", start_codon_count), Style::default().fg(Color::Green)),
+                        Span::raw("  "),
+                        Span::styled("Stop: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{}", stop_codon_count), Style::default().fg(Color::Red)),
                     ]),
                 ];
 
                 let protein_lines = vec![
                     Line::from(vec![
-                        Span::styled(format!("AA Length: {}", amino_acid_length), Style::default().fg(Color::White)),
+                        Span::styled("Amino acids: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{}", aa_length), Style::default().fg(Color::Green)),
+                        Span::raw("  "),
+                        Span::styled("MW: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{:.1} kDa", mol_weight / 1000.0), Style::default().fg(Color::Blue)),
                     ]),
                     Line::from(vec![
-                        Span::styled(format!("Est. MW: {:.1} Da", molecular_weight), Style::default().fg(Color::Green)),
+                        Span::styled("Hydrophobicity: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{:.1}%", hydrophobicity), Style::default().fg(Color::Yellow)),
                     ]),
                     Line::from(vec![
-                        Span::styled(format!("Hydrophobicity: {:.1}%", hydrophobicity), Style::default().fg(Color::Blue)),
-                    ]),
-                    Line::from(vec![
-                        Span::styled(format!("+Charges: {} | -Charges: {}", positive_charges, negative_charges), Style::default().fg(Color::Yellow)),
-                    ]),
-                    Line::from(vec![
-                        Span::styled(format!("Current: {:.1}% | Opposite: {:.1}%", app.current_strand_confidence, app.opposite_strand_confidence), Style::default().fg(Color::Magenta)),
+                        Span::styled("Charged: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{} (+)", positive_residues), Style::default().fg(Color::Blue)),
+                        Span::raw("  "),
+                        Span::styled(format!("{} (-)", negative_residues), Style::default().fg(Color::Red)),
+                        Span::raw("  "),
+                        Span::styled("ORFs: ", Style::default().fg(Color::White)),
+                        Span::styled(format!("{}", orf_count), Style::default().fg(Color::Green)),
                     ]),
                 ];
 
@@ -379,49 +395,117 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
 
                     if has_low_threshold {
-                        display_entries /= 2;
+                        display_entries = display_entries.min(app.histogram_data.len());
+                        display_entries = display_entries / 2;
+                        display_entries = display_entries.max(1);
                     }
 
-                    for (i, (protein, similarity)) in app.histogram_data.iter().take(display_entries).enumerate() {
-                        let color = match_colors[i % match_colors.len()];
-                        let similarity_bar = if *similarity > 0.0 {
-                            let bar_length = (*similarity / 20.0).min(30.0) as usize;
-                            "█".repeat(bar_length)
-                        } else {
-                            String::new()
-                        };
+                    for (i, (protein, similarity)) in app.histogram_data.iter().enumerate().take(display_entries) {
+                        let percentage = *similarity;
 
-                        match_lines.push(Line::from(vec![
-                            Span::styled(format!("{}: {:.1}% ", protein.id, similarity), Style::default().fg(color)),
-                            Span::styled(similarity_bar, Style::default().fg(color)),
-                        ]));
+                        let color_index = i % match_colors.len();
+                        let color = match_colors[color_index];
+
+                        let match_line = Line::from(vec![
+                            Span::styled(
+                                format!("{:>2}. ", i + 1),
+                                Style::default().fg(Color::White)
+                            ),
+                            Span::styled(
+                                format!("{:<15}", protein.id),
+                                Style::default().fg(color)
+                            ),
+                            Span::raw(" - "),
+                            Span::styled(
+                                format!("{:.1}%", percentage),
+                                Style::default().fg(if percentage >= 50.0 { Color::Green } else { Color::Yellow })
+                            ),
+                            Span::raw(" match"),
+                        ]);
+
+                        match_lines.push(match_line);
                     }
                 } else {
                     match_lines.push(Line::from(vec![
-                        Span::styled("No protein matches available", Style::default().fg(Color::Gray)),
+                        Span::styled(
+                            "No significant matches found",
+                            Style::default().fg(Color::DarkGray)
+                        ),
                     ]));
                 }
 
                 let matches_widget = Paragraph::new(match_lines)
-                    .block(Block::default().title("Top Protein Matches").borders(Borders::ALL))
                     .wrap(ratatui::widgets::Wrap { trim: true });
 
                 f.render_widget(matches_widget, content_layout[1]);
             }
+
+            let current_confidence_color = if app.current_strand_confidence > app.opposite_strand_confidence {
+                Color::Green
+            } else if app.current_strand_confidence < app.opposite_strand_confidence {
+                Color::Red
+            } else {
+                Color::Yellow
+            };
+
+            let opposite_confidence_color = if app.opposite_strand_confidence > app.current_strand_confidence {
+                Color::Green
+            } else if app.opposite_strand_confidence < app.current_strand_confidence {
+                Color::Red
+            } else {
+                Color::Yellow
+            };
+
+            let mut confidence_spans = Vec::new();
+
+            if app.closest_protein.is_some() {
+                confidence_spans.push(Span::raw("Confidence: "));
+
+                confidence_spans.push(Span::styled(
+                    format!("Current {:.1}%", app.current_strand_confidence),
+                    Style::default().fg(current_confidence_color)
+                ));
+
+                confidence_spans.push(Span::raw(" / "));
+
+                confidence_spans.push(Span::styled(
+                    format!("Opposite {:.1}%", app.opposite_strand_confidence),
+                    Style::default().fg(opposite_confidence_color)
+                ));
+
+                if app.current_strand_confidence > app.opposite_strand_confidence {
+                    confidence_spans.push(Span::styled(
+                        " (Current strand more likely)",
+                        Style::default().fg(Color::Green)
+                    ));
+                } else if app.current_strand_confidence < app.opposite_strand_confidence {
+                    confidence_spans.push(Span::styled(
+                        " (Opposite strand more likely)",
+                        Style::default().fg(Color::Red)
+                    ));
+                }
+            } else {
+                confidence_spans.push(Span::styled(
+                    "No protein match found yet",
+                    Style::default().fg(Color::DarkGray)
+                ));
+            }
+
+            let confidence_text = Line::from(confidence_spans);
+            let confidence_widget = Paragraph::new(vec![confidence_text])
+                .block(Block::default().title("Confidence").borders(Borders::ALL))
+                .alignment(Alignment::Center);
+            f.render_widget(confidence_widget, chunks[5]);
         })?;
 
         if let Event::Key(key) = event::read()? {
             match key.code {
                 KeyCode::Char('q') => break,
-                KeyCode::Char('s') => {
-                    app.toggle_strand_mode();
-                }
-                KeyCode::Char(c) if matches!(c, 'A' | 'T' | 'G' | 'C' | 'a' | 't' | 'g' | 'c' | 'U' | 'u') => {
-                    app.on_key(c);
-                }
-                KeyCode::Backspace => {
-                    app.on_backspace();
-                }
+                KeyCode::Char(' ') => {},
+                KeyCode::Char('s') => app.toggle_strand_mode(),
+                KeyCode::Char(c) => app.on_key(c),
+                KeyCode::Backspace => app.on_backspace(),
+                KeyCode::Esc => break,
                 _ => {}
             }
         }
