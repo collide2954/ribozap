@@ -71,3 +71,37 @@ pub fn count_stop_codons(dna: &str) -> usize {
     }
     count
 }
+
+/// Convert three-letter amino acid code to single-letter code
+pub fn three_letter_to_single_letter(three_letter: &str) -> char {
+    match three_letter {
+        "Ala" => 'A',
+        "Arg" => 'R',
+        "Asn" => 'N',
+        "Asp" => 'D',
+        "Cys" => 'C',
+        "Glu" => 'E',
+        "Gln" => 'Q',
+        "Gly" => 'G',
+        "His" => 'H',
+        "Ile" => 'I',
+        "Leu" => 'L',
+        "Lys" => 'K',
+        "Met" => 'M',
+        "Phe" => 'F',
+        "Pro" => 'P',
+        "Ser" => 'S',
+        "Thr" => 'T',
+        "Trp" => 'W',
+        "Tyr" => 'Y',
+        "Val" => 'V',
+        "Stop" => '*',
+        _ => '?',
+    }
+}
+
+/// Convert a codon to its corresponding single-letter amino acid code
+pub fn codon_to_single_letter_amino_acid(codon: &str) -> char {
+    let three_letter = codon_to_amino_acid(codon);
+    three_letter_to_single_letter(three_letter)
+}

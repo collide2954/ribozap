@@ -1,5 +1,9 @@
 //! DNA/RNA sequence analysis functions
 
+use crate::sequence::codon::codon_to_single_letter_amino_acid;
+use crate::sequence::conversion::dna_sequence_to_mrna;
+use crate::protein::molecular_weights::get_amino_acid_molecular_weight;
+
 /// Calculate GC content as a percentage
 pub fn calculate_gc_content(dna: &str) -> f64 {
     if dna.is_empty() {
@@ -60,13 +64,31 @@ pub fn calculate_amino_acid_length(dna: &str) -> usize {
     dna.len() / 3
 }
 
-/// Estimate molecular weight based on amino acid count
+/// Calculate precise molecular weight based on actual amino acid composition
 pub fn estimate_molecular_weight(dna: &str) -> f64 {
     if dna.len() < 3 {
         return 0.0;
     }
-    let amino_acid_count = dna.len() / 3;
-    amino_acid_count as f64 * 110.0
+
+    // Convert DNA to mRNA
+    let mrna = dna_sequence_to_mrna(dna);
+    let mut total_weight = 0.0;
+
+    // Process each codon
+    for i in (0..mrna.len()).step_by(3) {
+        if i + 2 < mrna.len() {
+            let codon = &mrna[i..i+3];
+            let amino_acid = codon_to_single_letter_amino_acid(codon);
+
+            // Skip stop codons in the weight calculation
+            if amino_acid != '*' {
+                total_weight += get_amino_acid_molecular_weight(amino_acid);
+            }
+        }
+    }
+
+    // Add the weight of water for the N-terminus and C-terminus
+    total_weight + 18.015
 }
 
 /// Calculate hydrophobicity index

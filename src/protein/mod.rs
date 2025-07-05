@@ -2,10 +2,12 @@
 
 pub mod dataset;
 pub mod matching;
+pub mod molecular_weights;
 
 // Re-export commonly used types and functions
 pub use dataset::*;
 pub use matching::*;
+pub use molecular_weights::*;
 
 #[cfg(test)]
 mod tests {

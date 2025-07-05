@@ -32,3 +32,10 @@ pub fn mrna_to_trna(base: char) -> char {
         _ => '?',
     }
 }
+
+/// Convert a complete DNA sequence to mRNA sequence
+pub fn dna_sequence_to_mrna(dna: &str) -> String {
+    dna.chars()
+        .map(|base| dna_to_mrna(base))
+        .collect()
+}
