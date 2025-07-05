@@ -22,17 +22,6 @@ pub fn dna_to_mrna(base: char) -> char {
     }
 }
 
-/// Convert an mRNA base to its corresponding tRNA base
-pub fn mrna_to_trna(base: char) -> char {
-    match base.to_uppercase().next().unwrap_or(' ') {
-        'A' => 'U',
-        'U' => 'A',
-        'G' => 'C',
-        'C' => 'G',
-        _ => '?',
-    }
-}
-
 /// Convert a complete DNA sequence to mRNA sequence
 pub fn dna_sequence_to_mrna(dna: &str) -> String {
     dna.chars()
