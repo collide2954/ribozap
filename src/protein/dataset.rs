@@ -1,5 +1,3 @@
-//! Protein dataset download and parsing functionality
-
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read};
@@ -7,7 +5,6 @@ use std::path::Path;
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 
-/// Small protein data structure
 #[derive(Debug, Clone)]
 pub struct SmallProtein {
     pub species: String,
@@ -24,7 +21,6 @@ pub struct SmallProtein {
     pub phylo_csf_mean: f64,
 }
 
-/// Download and parse the small protein dataset
 pub fn download_and_parse_small_protein_dataset() -> Result<Vec<SmallProtein>, Box<dyn Error>> {
     let url = "http://bigdata.ibp.ac.cn/SmProt/datadownload/SmProt2_LiteratureMining.txt.gz";
     let temp_file = "small_protein_dataset.txt.gz";

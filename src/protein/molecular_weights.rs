@@ -1,68 +1,58 @@
-//! Molecular weights of amino acids
-//!
-//! This module contains the exact molecular weights of all 20 standard amino acids
-//! in Daltons (Da). These weights are for the amino acid residues in a protein chain,
-//! which means they exclude the weight of water that is removed during peptide bond formation.
-
 use std::collections::HashMap;
 
-/// Get the molecular weight of an amino acid by its single-letter code
 pub fn get_amino_acid_molecular_weight(amino_acid: char) -> f64 {
     match amino_acid {
-        'A' => 71.04,   // Alanine
-        'R' => 156.10,  // Arginine
-        'N' => 114.04,  // Asparagine
-        'D' => 115.03,  // Aspartic acid
-        'C' => 103.01,  // Cysteine
-        'E' => 129.04,  // Glutamic acid
-        'Q' => 128.06,  // Glutamine
-        'G' => 57.02,   // Glycine
-        'H' => 137.06,  // Histidine
-        'I' => 113.08,  // Isoleucine
-        'L' => 113.08,  // Leucine
-        'K' => 128.09,  // Lysine
-        'M' => 131.04,  // Methionine
-        'F' => 147.07,  // Phenylalanine
-        'P' => 97.05,   // Proline
-        'S' => 87.03,   // Serine
-        'T' => 101.05,  // Threonine
-        'W' => 186.08,  // Tryptophan
-        'Y' => 163.06,  // Tyrosine
-        'V' => 99.07,   // Valine
-        '*' => 0.0,     // Stop codon
-        _ => 0.0,       // Unknown amino acid
+        'A' => 71.04,
+        'R' => 156.10,
+        'N' => 114.04,
+        'D' => 115.03,
+        'C' => 103.01,
+        'E' => 129.04,
+        'Q' => 128.06,
+        'G' => 57.02,
+        'H' => 137.06,
+        'I' => 113.08,
+        'L' => 113.08,
+        'K' => 128.09,
+        'M' => 131.04,
+        'F' => 147.07,
+        'P' => 97.05,
+        'S' => 87.03,
+        'T' => 101.05,
+        'W' => 186.08,
+        'Y' => 163.06,
+        'V' => 99.07,
+        '*' => 0.0,
+        _ => 0.0,
     }
 }
 
-/// Get a HashMap of all amino acid molecular weights
 pub fn get_all_molecular_weights() -> HashMap<char, f64> {
     let mut weights = HashMap::new();
-
-    weights.insert('A', 71.04);   // Alanine
-    weights.insert('R', 156.10);  // Arginine
-    weights.insert('N', 114.04);  // Asparagine
-    weights.insert('D', 115.03);  // Aspartic acid
-    weights.insert('C', 103.01);  // Cysteine
-    weights.insert('E', 129.04);  // Glutamic acid
-    weights.insert('Q', 128.06);  // Glutamine
-    weights.insert('G', 57.02);   // Glycine
-    weights.insert('H', 137.06);  // Histidine
-    weights.insert('I', 113.08);  // Isoleucine
-    weights.insert('L', 113.08);  // Leucine
-    weights.insert('K', 128.09);  // Lysine
-    weights.insert('M', 131.04);  // Methionine
-    weights.insert('F', 147.07);  // Phenylalanine
-    weights.insert('P', 97.05);   // Proline
-    weights.insert('S', 87.03);   // Serine
-    weights.insert('T', 101.05);  // Threonine
-    weights.insert('W', 186.08);  // Tryptophan
-    weights.insert('Y', 163.06);  // Tyrosine
-    weights.insert('V', 99.07);   // Valine
-
+    weights.insert('A', 71.04);
+    weights.insert('R', 156.10);
+    weights.insert('N', 114.04);
+    weights.insert('D', 115.03);
+    weights.insert('C', 103.01);
+    weights.insert('E', 129.04);
+    weights.insert('Q', 128.06);
+    weights.insert('G', 57.02);
+    weights.insert('H', 137.06);
+    weights.insert('I', 113.08);
+    weights.insert('L', 113.08);
+    weights.insert('K', 128.09);
+    weights.insert('M', 131.04);
+    weights.insert('F', 147.07);
+    weights.insert('P', 97.05);
+    weights.insert('S', 87.03);
+    weights.insert('T', 101.05);
+    weights.insert('W', 186.08);
+    weights.insert('Y', 163.06);
+    weights.insert('V', 99.07);
+    weights.insert('*', 0.0);
     weights
 }
 
-/// Calculate the exact molecular weight of a protein sequence
 pub fn calculate_protein_molecular_weight(amino_acid_sequence: &str) -> f64 {
     let mut total_weight = 0.0;
 
@@ -70,8 +60,6 @@ pub fn calculate_protein_molecular_weight(amino_acid_sequence: &str) -> f64 {
         total_weight += get_amino_acid_molecular_weight(amino_acid);
     }
 
-    // Add the weight of water (18.015 Da) to account for the N-terminus and C-terminus
-    // The protein has one additional H2O compared to the sum of residue weights
     total_weight + 18.015
 }
 
@@ -90,8 +78,6 @@ mod tests {
 
     #[test]
     fn test_protein_molecular_weight() {
-        // Test with a simple dipeptide: Ala-Gly
-        // Should be 71.04 + 57.02 + 18.015 = 146.075
         let weight = calculate_protein_molecular_weight("AG");
         assert!((weight - 146.075).abs() < 0.001);
     }

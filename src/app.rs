@@ -1,11 +1,8 @@
-//! Main application state and logic
-
 use ratatui::style::Color;
 use crate::protein::{SmallProtein, download_and_parse_small_protein_dataset, calculate_dna_similarity, identify_matching_positions};
 use crate::sequence::{get_complementary_base, dna_to_mrna, codon_to_amino_acid};
 use crate::ui::colors::get_amino_acid_color;
 
-/// Main application state
 pub struct App {
     pub input: String,
     pub complementary: String,
@@ -27,7 +24,6 @@ pub struct App {
 }
 
 impl App {
-    /// Create a new App instance
     pub fn new() -> App {
         let mut app = App {
             input: String::new(),
@@ -62,7 +58,6 @@ impl App {
         app
     }
 
-    /// Find the closest protein match
     pub fn find_closest_protein(&mut self) {
         if self.input.is_empty() || self.small_proteins.is_empty() {
             self.closest_protein = None;
@@ -83,7 +78,6 @@ impl App {
             let positive_similarity = calculate_dna_similarity(&self.input, &protein.rna_seq);
             let negative_similarity = calculate_dna_similarity(&self.complementary, &protein.rna_seq);
 
-            // Collect ALL similarities for both strands regardless of protein strand annotation
             positive_strand_similarities.push(positive_similarity);
             negative_strand_similarities.push(negative_similarity);
 
@@ -100,7 +94,6 @@ impl App {
             }
         }
 
-        // Always calculate confidence for current vs opposite strand
         self.current_strand_confidence = self.calculate_strand_confidence(&positive_strand_similarities);
         self.opposite_strand_confidence = self.calculate_strand_confidence(&negative_strand_similarities);
 
@@ -108,7 +101,6 @@ impl App {
         self.matching_positions = best_matching_positions;
     }
 
-    /// Calculate strand confidence based on similarities
     pub fn calculate_strand_confidence(&self, similarities: &[f64]) -> f64 {
         if similarities.is_empty() {
             return 0.0;
@@ -126,7 +118,6 @@ impl App {
         sum / top_n as f64
     }
 
-    /// Toggle between positive and negative strand modes
     pub fn toggle_strand_mode(&mut self) {
         std::mem::swap(&mut self.input, &mut self.complementary);
         self.is_positive_strand = !self.is_positive_strand;
@@ -135,7 +126,6 @@ impl App {
         self.protein_match_needed = false;
     }
 
-    /// Update all derived sequences based on current input
     pub fn update_sequences(&mut self) {
         if self.is_positive_strand {
             self.complementary = self.input
@@ -174,7 +164,6 @@ impl App {
         self.last_input_length = current_length;
     }
 
-    /// Perform protein matching if needed
     pub fn perform_protein_matching_if_needed(&mut self) {
         if self.protein_match_needed {
             self.find_closest_protein();
@@ -182,7 +171,6 @@ impl App {
         }
     }
 
-    /// Get the current partial codon for completion display
     pub fn get_current_partial_codon(&self) -> String {
         if self.mrna.is_empty() {
             return String::new();
@@ -198,7 +186,6 @@ impl App {
         mrna_str[codon_start..].to_string()
     }
 
-    /// Update amino acid sequence with colors
     fn update_amino_acids(&mut self) {
         self.amino_acids = String::new();
         self.amino_acids_colored.clear();
@@ -231,7 +218,6 @@ impl App {
         }
     }
 
-    /// Handle key input
     pub fn on_key(&mut self, c: char) {
         if self.is_positive_strand {
             self.input.push(c);
@@ -241,7 +227,6 @@ impl App {
         self.update_sequences();
     }
 
-    /// Handle backspace
     pub fn on_backspace(&mut self) {
         if self.is_positive_strand {
             self.input.pop();

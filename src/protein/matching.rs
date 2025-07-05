@@ -1,6 +1,3 @@
-//! Protein sequence matching functionality
-
-/// Calculate DNA similarity between two sequences as a percentage
 pub fn calculate_dna_similarity(seq1: &str, seq2: &str) -> f64 {
     let seq1 = seq1.to_uppercase();
     let seq2 = seq2.to_uppercase();
@@ -20,7 +17,6 @@ pub fn calculate_dna_similarity(seq1: &str, seq2: &str) -> f64 {
     (matches as f64 / min_len as f64) * 100.0
 }
 
-/// Identify matching positions between two sequences
 pub fn identify_matching_positions(seq1: &str, seq2: &str) -> Vec<bool> {
     let seq1 = seq1.to_uppercase();
     let seq2 = seq2.to_uppercase();

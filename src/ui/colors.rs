@@ -1,8 +1,5 @@
-//! Color definitions for amino acids and UI elements
-
 use ratatui::style::Color;
 
-/// Get the display color for an amino acid
 pub fn get_amino_acid_color(amino: &str) -> Color {
     match amino {
         "Phe" => Color::Red,

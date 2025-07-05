@@ -1,5 +1,3 @@
-//! Display formatting functions for the UI
-
 use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
@@ -7,7 +5,6 @@ use ratatui::{
 use crate::sequence::codon::codon_to_amino_acid;
 use crate::ui::colors::get_amino_acid_color;
 
-/// Format sequence with spaces every 3 characters (triplets)
 pub fn format_triplets(sequence: &str) -> String {
     let mut result = String::new();
     let mut count = 0;
@@ -23,7 +20,6 @@ pub fn format_triplets(sequence: &str) -> String {
     result
 }
 
-/// Create a codon completion display showing possible amino acids
 pub fn create_codon_completion_display(partial_codon: &str) -> Vec<Line<'static>> {
     let mut lines = Vec::new();
 
