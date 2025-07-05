@@ -1,12 +1,11 @@
 [package]
 name = "ribozap"
 version = "0.1.0"
-edition = "2024"
-default-run = "ribozap"
+edition = "2021"
 
 [[bin]]
-name = "test_download"
-path = "src/test_download.rs"
+name = "ribozap"
+path = "src/main.rs"
 
 [dependencies]
 crossterm = "0.29.0"
