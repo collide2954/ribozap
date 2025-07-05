@@ -23,8 +23,6 @@ pub struct App {
     pub matching_positions: Vec<bool>,
     pub current_strand_confidence: f64,
     pub opposite_strand_confidence: f64,
-    pub histogram_data: Vec<(SmallProtein, f64)>,
-    pub max_histogram_entries: usize,
     pub last_input_length: usize,
     pub protein_match_needed: bool,
 }
@@ -49,8 +47,6 @@ impl App {
             matching_positions: Vec::new(),
             current_strand_confidence: 0.0,
             opposite_strand_confidence: 0.0,
-            histogram_data: Vec::new(),
-            max_histogram_entries: 10,
             last_input_length: 0,
             protein_match_needed: false,
         };
@@ -75,7 +71,6 @@ impl App {
             self.matching_positions.clear();
             self.current_strand_confidence = 0.0;
             self.opposite_strand_confidence = 0.0;
-            self.histogram_data.clear();
             return;
         }
 
@@ -86,26 +81,19 @@ impl App {
         let mut positive_strand_similarities = Vec::new();
         let mut negative_strand_similarities = Vec::new();
 
-        self.histogram_data.clear();
-
-        let mut all_similarities = Vec::new();
-
         for protein in &self.small_proteins {
             let positive_similarity = calculate_dna_similarity(&self.input, &protein.rna_seq);
             let negative_similarity = calculate_dna_similarity(&self.complementary, &protein.rna_seq);
 
-            if protein.strand == "+" {
-                positive_strand_similarities.push(positive_similarity);
-            } else if protein.strand == "-" {
-                negative_strand_similarities.push(negative_similarity);
-            }
+            // Collect ALL similarities for both strands regardless of protein strand annotation
+            positive_strand_similarities.push(positive_similarity);
+            negative_strand_similarities.push(negative_similarity);
+
             let (compare_seq, protein_seq, similarity) = if protein.strand == "-" {
                 (&self.complementary, &protein.rna_seq, negative_similarity)
             } else {
                 (&self.input, &protein.rna_seq, positive_similarity)
             };
-
-            all_similarities.push((protein.clone(), similarity));
 
             if similarity > best_similarity {
                 best_similarity = similarity;
@@ -114,19 +102,9 @@ impl App {
             }
         }
 
-        all_similarities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
-
-        self.histogram_data = all_similarities.into_iter()
-            .take(self.max_histogram_entries)
-            .collect();
-
-        if self.is_positive_strand {
-            self.current_strand_confidence = self.calculate_strand_confidence(&positive_strand_similarities);
-            self.opposite_strand_confidence = self.calculate_strand_confidence(&negative_strand_similarities);
-        } else {
-            self.current_strand_confidence = self.calculate_strand_confidence(&negative_strand_similarities);
-            self.opposite_strand_confidence = self.calculate_strand_confidence(&positive_strand_similarities);
-        }
+        // Always calculate confidence for current vs opposite strand
+        self.current_strand_confidence = self.calculate_strand_confidence(&positive_strand_similarities);
+        self.opposite_strand_confidence = self.calculate_strand_confidence(&negative_strand_similarities);
 
         self.closest_protein = best_match;
         self.matching_positions = best_matching_positions;
@@ -150,19 +128,16 @@ impl App {
         sum / top_n as f64
     }
 
-    /// Toggle between positive and negative strand mode
+    /// Toggle between positive and negative strand modes
     pub fn toggle_strand_mode(&mut self) {
         std::mem::swap(&mut self.input, &mut self.complementary);
-
         self.is_positive_strand = !self.is_positive_strand;
-
         self.update_sequences();
-
         self.find_closest_protein();
         self.protein_match_needed = false;
     }
 
-    /// Update all derived sequences
+    /// Update all derived sequences based on current input
     pub fn update_sequences(&mut self) {
         if self.is_positive_strand {
             self.complementary = self.input
@@ -196,6 +171,7 @@ impl App {
         self.current_codon_position = self.mrna.len() % 3;
 
         self.update_amino_acids();
+
         let current_length = self.input.len();
         if current_length < 10 || 
            self.last_input_length == 0 || 
@@ -213,7 +189,7 @@ impl App {
         }
     }
 
-    /// Get the current partial codon
+    /// Get the current partial codon for completion display
     pub fn get_current_partial_codon(&self) -> String {
         if self.mrna.is_empty() {
             return String::new();
@@ -229,8 +205,8 @@ impl App {
         mrna_str[codon_start..].to_string()
     }
 
-    /// Update amino acid sequence
-    pub fn update_amino_acids(&mut self) {
+    /// Update amino acid sequence with colors
+    fn update_amino_acids(&mut self) {
         self.amino_acids = String::new();
         self.amino_acids_colored.clear();
 
@@ -272,7 +248,7 @@ impl App {
         self.update_sequences();
     }
 
-    /// Handle backspace input
+    /// Handle backspace
     pub fn on_backspace(&mut self) {
         if self.is_positive_strand {
             self.input.pop();
