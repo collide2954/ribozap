@@ -2,7 +2,7 @@
 
 use ratatui::style::Color;
 use crate::protein::{SmallProtein, download_and_parse_small_protein_dataset, calculate_dna_similarity, identify_matching_positions};
-use crate::sequence::{get_complementary_base, dna_to_mrna, mrna_to_trna, codon_to_amino_acid};
+use crate::sequence::{get_complementary_base, dna_to_mrna, codon_to_amino_acid};
 use crate::ui::colors::get_amino_acid_color;
 
 /// Main application state
@@ -10,7 +10,6 @@ pub struct App {
     pub input: String,
     pub complementary: String,
     pub mrna: String,
-    pub trna: String,
     pub amino_acids: String,
     pub amino_acids_colored: Vec<(String, Color)>,
     pub current_codon_position: usize,
@@ -34,7 +33,6 @@ impl App {
             input: String::new(),
             complementary: String::new(),
             mrna: String::new(),
-            trna: String::new(),
             amino_acids: String::new(),
             amino_acids_colored: Vec::new(),
             current_codon_position: 0,
@@ -57,7 +55,7 @@ impl App {
                 app.small_proteins = proteins;
             },
             Err(e) => {
-                app.loading_error = Some(format!("Error loading proteins: {}", e));
+                app.loading_error = Some(format!("Error loading proteins: {e}"));
             }
         }
 
@@ -162,11 +160,6 @@ impl App {
                 .map(dna_to_mrna)
                 .collect();
         }
-
-        self.trna = self.mrna
-            .chars()
-            .map(mrna_to_trna)
-            .collect();
 
         self.current_codon_position = self.mrna.len() % 3;
 
