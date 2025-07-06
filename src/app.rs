@@ -3,7 +3,6 @@ use bio_seq::prelude::*;
 use bio_seq::translation::{TranslationTable, STANDARD};
 use crate::protein::{SmallProtein, download_and_parse_small_protein_dataset, calculate_dna_similarity, identify_matching_positions};
 use crate::sequence::{get_complementary_base, dna_to_mrna};
-use crate::ui::colors::get_amino_acid_color;
 use std::collections::HashMap;
 
 pub struct App {
@@ -242,7 +241,7 @@ impl App {
             } else {
                 "?".to_string()
             };
-            let color = get_amino_acid_color(&amino);
+            let color = Color::White;
 
             if !self.amino_acids.is_empty() {
                 self.amino_acids.push(' ');

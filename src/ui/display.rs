@@ -4,7 +4,6 @@ use ratatui::{
 };
 use bio_seq::prelude::*;
 use bio_seq::translation::{TranslationTable, STANDARD};
-use crate::ui::colors::get_amino_acid_color;
 
 pub fn format_triplets(sequence: &str) -> String {
     let mut result = String::new();
@@ -87,7 +86,7 @@ pub fn create_codon_completion_display(partial_codon: &str) -> Vec<Line<'static>
                     if i > 0 {
                         colored_amino_list.push(Span::raw("/"));
                     }
-                    colored_amino_list.push(Span::styled(amino.clone(), Style::default().fg(get_amino_acid_color(amino))));
+                    colored_amino_list.push(Span::styled(amino.clone(), Style::default().fg(Color::White)));
                 }
                 row.extend(colored_amino_list);
 
@@ -117,11 +116,10 @@ pub fn create_codon_completion_display(partial_codon: &str) -> Vec<Line<'static>
                 } else {
                     "?".to_string()
                 };
-                let color = get_amino_acid_color(&amino);
 
                 lines.push(Line::from(vec![
                     Span::styled(format!("{display_first}{display_second}{display_third} → "), Style::default().fg(Color::Cyan)),
-                    Span::styled(amino, Style::default().fg(color)),
+                    Span::styled(amino, Style::default().fg(Color::White)),
                 ]));
             }
         },
