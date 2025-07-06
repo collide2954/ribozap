@@ -1,6 +1,3 @@
-//! Base conversion functions for DNA/RNA sequences
-
-/// Convert a DNA base to its complementary base
 pub fn get_complementary_base(base: char) -> char {
     match base.to_uppercase().next().unwrap_or(' ') {
         'A' => 'T',
@@ -11,7 +8,6 @@ pub fn get_complementary_base(base: char) -> char {
     }
 }
 
-/// Convert a DNA base to its corresponding mRNA base
 pub fn dna_to_mrna(base: char) -> char {
     match base.to_uppercase().next().unwrap_or(' ') {
         'A' => 'U',
@@ -22,9 +18,21 @@ pub fn dna_to_mrna(base: char) -> char {
     }
 }
 
-/// Convert a complete DNA sequence to mRNA sequence
 pub fn dna_sequence_to_mrna(dna: &str) -> String {
     dna.chars()
         .map(dna_to_mrna)
+        .collect()
+}
+
+pub fn get_reverse_complement(dna: &str) -> String {
+    dna.chars()
+        .rev()
+        .map(get_complementary_base)
+        .collect()
+}
+
+pub fn get_complement(dna: &str) -> String {
+    dna.chars()
+        .map(get_complementary_base)
         .collect()
 }

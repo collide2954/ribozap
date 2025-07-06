@@ -8,6 +8,7 @@ name = "ribozap"
 path = "src/main.rs"
 
 [dependencies]
+bio-seq = { version = "0.14.2", features = ["translation"] }
 crossterm = "0.29.0"
 ratatui = "0.29.0"
 reqwest = { version = "0.12.22", features = ["blocking"] }

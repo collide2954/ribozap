@@ -131,10 +131,7 @@ fn render_amino_acid_section(f: &mut Frame, app: &App, area: Rect) {
 fn render_amino_acid_sequence(f: &mut Frame, app: &App, area: Rect) {
     let mut amino_spans = vec![Span::raw("Amino Acids: ")];
 
-    for (i, (amino, color)) in app.amino_acids_colored.iter().enumerate() {
-        if i > 0 {
-            amino_spans.push(Span::raw(" "));
-        }
+    for (amino, color) in app.amino_acids_colored.iter() {
         amino_spans.push(Span::styled(amino, Style::default().fg(*color)));
     }
 

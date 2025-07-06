@@ -1,6 +1,8 @@
 use ratatui::style::Color;
+use bio_seq::prelude::*;
+use bio_seq::translation::{TranslationTable, STANDARD};
 use crate::protein::{SmallProtein, download_and_parse_small_protein_dataset, calculate_dna_similarity, identify_matching_positions};
-use crate::sequence::{get_complementary_base, dna_to_mrna, codon_to_amino_acid};
+use crate::sequence::{get_complementary_base, dna_to_mrna};
 use crate::ui::colors::get_amino_acid_color;
 
 pub struct App {
@@ -195,15 +197,25 @@ impl App {
 
         while i + 2 < mrna_str.len() {
             let codon = &mrna_str[i..i+3];
-            let amino = codon_to_amino_acid(codon);
-            let color = get_amino_acid_color(amino);
+            let dna_codon = codon.replace('U', "T");
+
+            let amino = if let Ok(codon_seq) = dna_codon.parse::<Seq<Dna>>() {
+                if codon_seq.len() == 3 {
+                    STANDARD.to_amino(&codon_seq).to_string()
+                } else {
+                    "?".to_string()
+                }
+            } else {
+                "?".to_string()
+            };
+            let color = get_amino_acid_color(&amino);
 
             if !self.amino_acids.is_empty() {
                 self.amino_acids.push(' ');
             }
-            self.amino_acids.push_str(amino);
+            self.amino_acids.push_str(&amino);
 
-            self.amino_acids_colored.push((amino.to_string(), color));
+            self.amino_acids_colored.push((amino, color));
 
             i += 3;
         }
