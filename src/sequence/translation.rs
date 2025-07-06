@@ -12,7 +12,7 @@ pub fn translate_dna_to_amino(dna: &str) -> Result<String, String> {
 
             for codon_chunk in seq.chunks(3) {
                 if codon_chunk.len() == 3 {
-                    let amino = STANDARD.to_amino(&codon_chunk);
+                    let amino = STANDARD.to_amino(codon_chunk);
                     amino_acids.push(amino.to_string());
                 }
             }

@@ -14,17 +14,6 @@ mod tests {
     fn test_protein_dataset_and_similarity() -> Result<(), Box<dyn std::error::Error>> {
         let proteins = download_and_parse_small_protein_dataset()?;
 
-        println!("First few proteins:");
-        for (i, protein) in proteins.iter().take(5).enumerate() {
-            println!("{}. {} ({}): RNA length = {}, AA length = {}", 
-                i + 1, 
-                protein.id, 
-                protein.species, 
-                protein.rna_seq.len(), 
-                protein.aa_seq.len()
-            );
-        }
-
         if !proteins.is_empty() {
             let test_seq = "ATGAAAAACCCCAGTTGGATTAGAAAGAACTGGCTTCTTGTGGCTGGGGTGACTTTCATAGGCGTCCATCTTGGAACATACTTTATACAGAGAGTTGCAAAAGAGTCTGTGAGGTCTGAGGCCAGAGGCAGACAAAAGAATATTGAAGAATGA";
             let mut best_match = None;
@@ -36,8 +25,7 @@ mod tests {
                     best_match = Some(protein);
                 }
             }
-            if let Some(protein) = best_match {
-                println!("Best match: {} ({}), similarity: {:.2}%", protein.id, protein.species, best_similarity);
+            if let Some(_protein) = best_match {
             }
         }
         Ok(())
