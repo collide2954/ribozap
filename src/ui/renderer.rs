@@ -197,24 +197,61 @@ fn build_protein_info_lines(protein: &crate::SmallProtein, matching_positions: &
         triplet_count += 1;
         if triplet_count == 3 && i < protein.rna_seq.len() - 1 {
             rna_seq_spans.push(Span::raw(" "));
-        }
-        if triplet_count == 3 {
             triplet_count = 0;
         }
     }
 
-    let mut lines = Vec::new();
-    lines.push(Line::from(rna_seq_spans));
-    lines.push(Line::from(vec![Span::raw("")]));
-    lines.push(Line::from(vec![Span::raw(format!("ID: {}", protein.id))]));
-    lines.push(Line::from(vec![Span::raw(format!("Species: {}", protein.species))]));
-    lines.push(Line::from(vec![Span::raw(format!("Chromosome: {}", protein.chromosome))]));
-    lines.push(Line::from(vec![Span::raw(format!("Strand: {}", protein.strand))]));
-    lines.push(Line::from(vec![Span::raw(format!("Start: {}", protein.start))]));
-    lines.push(Line::from(vec![Span::raw(format!("Stop: {}", protein.stop))]));
-    lines.push(Line::from(vec![Span::raw(format!("Start Codon: {}", protein.start_codon))]));
-    lines.push(Line::from(vec![Span::raw(format!("PhyloCSF Mean: {:.2}", protein.phylo_csf_mean))]));
-    lines
+    vec![
+        Line::from(vec![
+            Span::raw("Species: "),
+            Span::styled(protein.species.clone(), Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::raw("ID: "),
+            Span::styled(protein.id.clone(), Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from(vec![
+            Span::raw("Length: "),
+            Span::styled(protein.length.to_string(), Style::default().fg(Color::Blue)),
+        ]),
+        Line::from(vec![
+            Span::raw("Chromosome: "),
+            Span::styled(protein.chromosome.clone(), Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(vec![
+            Span::raw("Start: "),
+            Span::styled(protein.start.to_string(), Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::raw("Stop: "),
+            Span::styled(protein.stop.to_string(), Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from(vec![
+            Span::raw("Strand: "),
+            Span::styled(protein.strand.clone(), Style::default().fg(Color::Blue)),
+        ]),
+        Line::from(vec![
+            Span::raw("Blocks: "),
+            Span::styled(protein.blocks.clone(), Style::default().fg(Color::Cyan)),
+        ]),
+        Line::from(vec![
+            Span::raw("Start Codon: "),
+            Span::styled(protein.start_codon.clone(), Style::default().fg(Color::Green)),
+        ]),
+        Line::from(vec![
+            Span::raw("PhyloCSF Mean: "),
+            Span::styled(protein.phylo_csf_mean.to_string(), Style::default().fg(Color::Yellow)),
+        ]),
+        Line::from({
+            let mut spans = vec![Span::raw("RNA Seq: ")];
+            spans.extend(rna_seq_spans);
+            spans
+        }),
+        Line::from(vec![
+            Span::raw("AA Seq: "),
+            Span::styled(protein.aa_seq.clone(), Style::default().fg(Color::Magenta)),
+        ]),
+    ]
 }
 
 fn render_right_panel(f: &mut Frame, app: &App, area: Rect) {
