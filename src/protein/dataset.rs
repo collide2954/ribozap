@@ -237,50 +237,48 @@ pub fn download_and_parse_small_protein_dataset_with_progress(
     Ok(proteins)
 }
 
-fn parse_float_field(field: &str, line_num: usize, field_name: &str, errors_encountered: &mut usize) -> f64 {
+fn parse_field<T>(
+    field: &str,
+    line_num: usize,
+    field_name: &str,
+    errors_encountered: &mut usize,
+    default_value: T,
+    additional_invalid_values: &[&str]
+) -> T
+where
+    T: std::str::FromStr + std::fmt::Display + Copy,
+    T::Err: std::fmt::Display,
+{
     let trimmed = field.trim();
 
-    // Handle common invalid float values
-    match trimmed {
-        "" | "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." | "NaN" | "nan" => {
-            debug!("Line {}: {} is '{}', using default value 0.0", line_num, field_name, trimmed);
-            0.0
-        },
-        _ => {
-            trimmed.parse().unwrap_or_else(|e| {
-                // Only warn for truly unexpected parsing errors, not common placeholders
-                if !trimmed.is_empty() && !matches!(trimmed, "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." | "NaN" | "nan") {
-                    warn!("Line {}: Failed to parse {} '{}': {}", line_num, field_name, trimmed, e);
-                    *errors_encountered += 1;
-                } else {
-                    debug!("Line {}: {} is '{}', using default value 0.0", line_num, field_name, trimmed);
-                }
-                0.0
-            })
-        }
+    // Common invalid values
+    let common_invalid = ["", "NA", "NULL", "null", "N/A", "n/a", "-", "."];
+    let all_invalid: Vec<&str> = common_invalid.iter()
+        .chain(additional_invalid_values.iter())
+        .copied()
+        .collect();
+
+    if all_invalid.contains(&trimmed) {
+        debug!("Line {line_num}: {field_name} is '{trimmed}', using default value {default_value}");
+        return default_value;
     }
+
+    trimmed.parse().unwrap_or_else(|e| {
+        // Only warn for truly unexpected parsing errors, not common placeholders
+        if !trimmed.is_empty() && !all_invalid.contains(&trimmed) {
+            warn!("Line {line_num}: Failed to parse {field_name} '{trimmed}': {e}");
+            *errors_encountered += 1;
+        } else {
+            debug!("Line {line_num}: {field_name} is '{trimmed}', using default value {default_value}");
+        }
+        default_value
+    })
+}
+
+fn parse_float_field(field: &str, line_num: usize, field_name: &str, errors_encountered: &mut usize) -> f64 {
+    parse_field(field, line_num, field_name, errors_encountered, 0.0, &["NaN", "nan"])
 }
 
 fn parse_usize_field(field: &str, line_num: usize, field_name: &str, errors_encountered: &mut usize) -> usize {
-    let trimmed = field.trim();
-
-    // Handle common invalid usize values
-    match trimmed {
-        "" | "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." => {
-            debug!("Line {}: {} is '{}', using default value 0", line_num, field_name, trimmed);
-            0
-        },
-        _ => {
-            trimmed.parse().unwrap_or_else(|e| {
-                // Only warn for truly unexpected parsing errors, not common placeholders
-                if !trimmed.is_empty() && !matches!(trimmed, "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." ) {
-                    warn!("Line {}: Failed to parse {} '{}': {}", line_num, field_name, trimmed, e);
-                    *errors_encountered += 1;
-                } else {
-                    debug!("Line {}: {} is '{}', using default value 0", line_num, field_name, trimmed);
-                }
-                0
-            })
-        }
-    }
+    parse_field(field, line_num, field_name, errors_encountered, 0, &[])
 }
