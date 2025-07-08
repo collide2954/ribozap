@@ -1,9 +1,12 @@
+use log::trace;
+
 pub fn calculate_dna_similarity(seq1: &str, seq2: &str) -> f64 {
     let seq1 = seq1.to_uppercase();
     let seq2 = seq2.to_uppercase();
 
     let min_len = seq1.len().min(seq2.len());
     if min_len == 0 {
+        trace!("One or both sequences are empty, returning 0.0 similarity");
         return 0.0;
     }
 
@@ -13,17 +16,25 @@ pub fn calculate_dna_similarity(seq1: &str, seq2: &str) -> f64 {
         .filter(|(a, b)| a == b)
         .count();
 
-    (matches as f64 / min_len as f64) * 100.0
+    let similarity = (matches as f64 / min_len as f64) * 100.0;
+    trace!("DNA similarity calculated: {similarity:.2}% ({matches}/{min_len} matches)");
+    
+    similarity
 }
 
 pub fn identify_matching_positions(seq1: &str, seq2: &str) -> Vec<bool> {
     let seq1 = seq1.to_uppercase();
     let seq2 = seq2.to_uppercase();
 
-    seq1.chars()
+    let matches = seq1.chars()
         .zip(seq2.chars())
         .map(|(a, b)| a == b)
-        .collect()
+        .collect::<Vec<bool>>();
+    
+    let match_count = matches.iter().filter(|&&m| m).count();
+    trace!("Identified {} matching positions out of {} total", match_count, matches.len());
+    
+    matches
 }
 
 pub fn calculate_kmer_similarity<const K: usize>(seq1: &str, seq2: &str) -> f64 {

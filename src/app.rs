@@ -4,8 +4,11 @@ use bio_seq::translation::{TranslationTable, STANDARD};
 use crate::protein::{SmallProtein, calculate_dna_similarity, identify_matching_positions, DatasetProgress};
 use crate::sequence::{get_complementary_base, dna_to_mrna};
 use std::collections::HashMap;
-use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
+use log::{info, warn, error, debug, trace};
+
+
 
 pub struct App {
     pub input: String,
@@ -55,6 +58,7 @@ pub enum SearchField {
 
 impl App {
     pub fn new() -> App {
+        debug!("Creating new App instance");
         App {
             input: String::new(),
             complementary: String::new(),
@@ -92,21 +96,21 @@ impl App {
     pub fn load_datasets(&mut self) {
         use crate::protein::download_and_parse_small_protein_dataset_with_progress;
         
+        info!("Starting dataset loading");
         self.is_loading_proteins = true;
         self.loading_error = None;
         self.dataset_progress = Some(DatasetProgress::CheckingCache);
         
-        // Create a progress callback that updates the app state
-        // Note: This is a simplified version - in a real async implementation,
-        // you'd want to use channels or other mechanisms for thread-safe updates
         match download_and_parse_small_protein_dataset_with_progress(None) {
             Ok(proteins) => {
                 self.loaded_proteins_count = proteins.len();
                 self.small_proteins = proteins;
                 self.is_loading_proteins = false;
                 self.dataset_progress = Some(DatasetProgress::Complete);
+                info!("Successfully loaded {} proteins", self.loaded_proteins_count);
             },
             Err(e) => {
+                error!("Failed to load protein datasets: {e}");
                 self.loading_error = Some(format!("Error loading proteins: {e}"));
                 self.is_loading_proteins = false;
                 self.dataset_progress = Some(DatasetProgress::Error(e.to_string()));
@@ -163,9 +167,11 @@ impl App {
             self.matching_positions.clear();
             self.current_strand_confidence = 0.0;
             self.opposite_strand_confidence = 0.0;
+            debug!("No input or proteins available for matching");
             return;
         }
 
+        trace!("Finding closest protein match for input length: {}", self.input.len());
         let mut best_match = None;
         let mut best_similarity = 0.0;
         let mut best_matching_positions = Vec::new();
@@ -196,6 +202,10 @@ impl App {
         self.current_strand_confidence = self.calculate_strand_confidence(&positive_strand_similarities);
         self.opposite_strand_confidence = self.calculate_strand_confidence(&negative_strand_similarities);
 
+        if let Some(ref protein) = best_match {
+            debug!("Found best protein match: {} (similarity: {:.4})", protein.id, best_similarity);
+        }
+
         self.closest_protein = best_match;
         self.matching_positions = best_matching_positions;
     }
@@ -218,6 +228,10 @@ impl App {
     }
 
     pub fn toggle_strand_mode(&mut self) {
+        info!("Toggling strand mode from {} to {}",
+              if self.is_positive_strand { "positive" } else { "negative" },
+              if self.is_positive_strand { "negative" } else { "positive" });
+
         std::mem::swap(&mut self.input, &mut self.complementary);
         self.is_positive_strand = !self.is_positive_strand;
         self.update_sequences();
@@ -226,6 +240,9 @@ impl App {
     }
 
     pub fn update_sequences(&mut self) {
+        trace!("Updating sequences for {} strand",
+               if self.is_positive_strand { "positive" } else { "negative" });
+
         if self.is_positive_strand {
             self.complementary = self.input
                 .chars()
@@ -256,9 +273,11 @@ impl App {
 
         let current_length = self.input.len();
         if current_length < 10 || 
-           self.last_input_length == 0 || 
+           self.last_input_length == 0 ||
            current_length.abs_diff(self.last_input_length) >= 3 {
             self.protein_match_needed = true;
+            debug!("Protein matching needed due to sequence length change: {} -> {}",
+                   self.last_input_length, current_length);
         }
         self.last_input_length = current_length;
     }
@@ -328,6 +347,9 @@ impl App {
     }
 
     pub fn on_key(&mut self, c: char) {
+        trace!("Adding nucleotide '{}' to {} strand", c,
+               if self.is_positive_strand { "positive" } else { "negative" });
+
         if self.is_positive_strand {
             self.input.push(c);
         } else {
@@ -337,6 +359,9 @@ impl App {
     }
 
     pub fn on_backspace(&mut self) {
+        trace!("Removing nucleotide from {} strand",
+               if self.is_positive_strand { "positive" } else { "negative" });
+
         if self.is_positive_strand {
             self.input.pop();
         } else {
@@ -347,11 +372,14 @@ impl App {
 
     pub fn toggle_protein_searcher(&mut self) {
         self.show_protein_searcher = !self.show_protein_searcher;
+        debug!("Protein searcher toggled: {}", self.show_protein_searcher);
+
         if self.show_protein_searcher {
             self.searcher_input.clear();
             self.selected_protein_index = 0;
             self.selected_search_field = 0;
             self.filter_proteins();
+            info!("Protein searcher opened with {} total proteins", self.small_proteins.len());
         }
     }
 
@@ -480,6 +508,8 @@ impl App {
     }
 
     fn filter_proteins(&mut self) {
+        let initial_count = self.small_proteins.len();
+
         if self.multi_search_mode {
             self.filtered_proteins = self.small_proteins.iter()
                 .filter(|protein| {
@@ -508,6 +538,8 @@ impl App {
         if self.selected_protein_index >= self.filtered_proteins.len() {
             self.selected_protein_index = 0;
         }
+
+        debug!("Protein search filtered from {} to {} results", initial_count, self.filtered_proteins.len());
     }
 
     fn matches_field_criteria(&self, protein: &SmallProtein, field: SearchField, value: &str) -> bool {
@@ -612,8 +644,11 @@ impl App {
 
     pub fn start_threaded_loading(&mut self) {
         if self.progress_receiver.is_some() || self.protein_receiver.is_some() {
-            return; // Already loading
+            warn!("Attempted to start loading while already in progress");
+            return;
         }
+
+        info!("Starting threaded protein dataset loading");
 
         // Create channels for progress and result communication
         let (progress_tx, progress_rx) = mpsc::channel();
@@ -626,6 +661,8 @@ impl App {
         thread::spawn(move || {
             use crate::protein::download_and_parse_small_protein_dataset_with_progress;
 
+            debug!("Background thread started for dataset loading");
+
             // Create progress callback that sends updates through channel
             let progress_callback = Box::new(move |progress: DatasetProgress| {
                 let _ = progress_tx.send(progress);
@@ -633,14 +670,21 @@ impl App {
 
             // Load dataset with progress callback
             let result = download_and_parse_small_protein_dataset_with_progress(Some(progress_callback));
-            
+
             // Send final result
             let final_result = match result {
-                Ok(proteins) => Ok(proteins),
-                Err(e) => Err(e.to_string()),
+                Ok(proteins) => {
+                    info!("Background loading completed successfully with {} proteins", proteins.len());
+                    Ok(proteins)
+                },
+                Err(e) => {
+                    error!("Background loading failed: {e}");
+                    Err(e.to_string())
+                }
             };
-            
+
             let _ = result_tx.send(final_result);
+            debug!("Background thread completed");
         });
     }
 
@@ -648,6 +692,7 @@ impl App {
         // Check for progress updates
         if let Some(ref progress_rx) = self.progress_receiver {
             while let Ok(progress) = progress_rx.try_recv() {
+                trace!("Loading progress update: {progress:?}");
                 self.dataset_progress = Some(progress);
             }
         }
@@ -661,8 +706,10 @@ impl App {
                         self.small_proteins = proteins;
                         self.is_loading_proteins = false;
                         self.dataset_progress = Some(DatasetProgress::Complete);
+                        info!("Loading completed successfully. {} proteins loaded", self.loaded_proteins_count);
                     },
                     Err(e) => {
+                        error!("Loading failed with error: {e}");
                         self.loading_error = Some(format!("Error loading proteins: {e}"));
                         self.is_loading_proteins = false;
                         self.dataset_progress = Some(DatasetProgress::Error(e));

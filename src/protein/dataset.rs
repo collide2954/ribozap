@@ -4,6 +4,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
+use log::{info, warn, error, debug, trace};
 
 #[derive(Debug, Clone)]
 pub struct SmallProtein {
@@ -36,12 +37,15 @@ pub fn get_data_dir() -> Result<PathBuf, Box<dyn Error>> {
         .ok_or("Could not determine data directory")?
         .join("ribozap");
 
+    debug!("Data directory path: {data_dir:?}");
     fs::create_dir_all(&data_dir)?;
+    trace!("Data directory created/verified: {data_dir:?}");
 
     Ok(data_dir)
 }
 
 pub fn download_and_parse_small_protein_dataset() -> Result<Vec<SmallProtein>, Box<dyn Error>> {
+    info!("Starting protein dataset download and parsing (without progress callback)");
     download_and_parse_small_protein_dataset_with_progress(None)
 }
 
@@ -50,37 +54,75 @@ pub fn download_and_parse_small_protein_dataset_with_progress(
 ) -> Result<Vec<SmallProtein>, Box<dyn Error>> {
     let url = "http://bigdata.ibp.ac.cn/SmProt/datadownload/SmProt2_LiteratureMining.txt.gz";
 
+    info!("Starting protein dataset download and parsing with progress tracking");
+    debug!("Dataset URL: {url}");
+
     let data_dir = get_data_dir()?;
     let temp_file = data_dir.join("small_protein_dataset.txt.gz");
     let extracted_file = data_dir.join("small_protein_dataset.txt");
+
+    debug!("Temp file path: {temp_file:?}");
+    debug!("Extracted file path: {extracted_file:?}");
 
     if let Some(ref callback) = progress_callback {
         callback(DatasetProgress::CheckingCache);
     }
 
     if !extracted_file.exists() {
+        info!("Extracted file does not exist, checking for compressed file");
+        
         if !temp_file.exists() {
+            info!("Compressed file does not exist, starting download");
+            
             if let Some(ref callback) = progress_callback {
                 callback(DatasetProgress::Downloading { bytes_downloaded: 0, total_bytes: None });
             }
 
             let client = Client::new();
-            let mut response = client.get(url).send()?;
+            debug!("HTTP client created, sending request to: {url}");
+            
+            let mut response = client.get(url).send()
+                .map_err(|e| {
+                    error!("Failed to send HTTP request: {e}");
+                    e
+                })?;
 
             let total_size = response.content_length();
+            debug!("Response received, content length: {total_size:?}");
+            
             let mut downloaded = 0u64;
 
-            let mut file = File::create(&temp_file)?;
+            let mut file = File::create(&temp_file)
+                .map_err(|e| {
+                    error!("Failed to create temp file {temp_file:?}: {e}");
+                    e
+                })?;
+            
+            info!("Starting file download to {temp_file:?}");
             let mut buffer = [0; 8192];
 
             loop {
-                let bytes_read = response.read(&mut buffer)?;
+                let bytes_read = response.read(&mut buffer)
+                    .map_err(|e| {
+                        error!("Error reading from HTTP response: {e}");
+                        e
+                    })?;
+                
                 if bytes_read == 0 {
                     break;
                 }
 
-                file.write_all(&buffer[..bytes_read])?;
+                file.write_all(&buffer[..bytes_read])
+                    .map_err(|e| {
+                        error!("Error writing to temp file: {e}");
+                        e
+                    })?;
+                
                 downloaded += bytes_read as u64;
+
+                if downloaded % (1024 * 1024) == 0 { // Log every MB
+                    trace!("Downloaded {downloaded} bytes");
+                }
 
                 if let Some(ref callback) = progress_callback {
                     callback(DatasetProgress::Downloading {
@@ -89,31 +131,70 @@ pub fn download_and_parse_small_protein_dataset_with_progress(
                     });
                 }
             }
+            
+            info!("Download completed successfully. Total bytes: {downloaded}");
+        } else {
+            info!("Compressed file already exists, skipping download");
         }
 
+        info!("Starting file extraction");
         if let Some(ref callback) = progress_callback {
             callback(DatasetProgress::Extracting);
         }
 
-        let compressed_file = File::open(&temp_file)?;
+        let compressed_file = File::open(&temp_file)
+            .map_err(|e| {
+                error!("Failed to open compressed file {temp_file:?}: {e}");
+                e
+            })?;
+        
         let decoder = GzDecoder::new(compressed_file);
         let mut reader = BufReader::new(decoder);
         let mut extracted_content = String::new();
-        reader.read_to_string(&mut extracted_content)?;
+        
+        reader.read_to_string(&mut extracted_content)
+            .map_err(|e| {
+                error!("Failed to decompress file: {e}");
+                e
+            })?;
 
-        std::fs::write(&extracted_file, extracted_content)?;
+        debug!("Decompressed content size: {} bytes", extracted_content.len());
+
+        std::fs::write(&extracted_file, extracted_content)
+            .map_err(|e| {
+                error!("Failed to write extracted file {extracted_file:?}: {e}");
+                e
+            })?;
+        
+        info!("File extraction completed successfully");
+    } else {
+        info!("Extracted file already exists, proceeding to parsing");
     }
 
-    let file = File::open(&extracted_file)?;
+    info!("Starting protein data parsing");
+    let file = File::open(&extracted_file)
+        .map_err(|e| {
+            error!("Failed to open extracted file {extracted_file:?}: {e}");
+            e
+        })?;
+    
     let reader = BufReader::new(file);
     let mut proteins = Vec::new();
     let mut lines_parsed = 0;
+    let mut errors_encountered = 0;
 
-    for line in reader.lines().skip(1) {
-        let line = line?;
+    for (line_num, line) in reader.lines().enumerate().skip(1) {
+        let line = line
+            .map_err(|e| {
+                error!("Error reading line {}: {}", line_num + 1, e);
+                e
+            })?;
+        
         let fields: Vec<&str> = line.split('\t').collect();
 
         if fields.len() < 12 {
+            warn!("Line {} has insufficient fields ({}), skipping", line_num + 1, fields.len());
+            errors_encountered += 1;
             continue;
         }
 
@@ -122,26 +203,49 @@ pub fn download_and_parse_small_protein_dataset_with_progress(
             id: fields[1].to_string(),
             rna_seq: fields[2].to_string(),
             aa_seq: fields[3].to_string(),
-            length: fields[4].parse().unwrap_or(0),
+            length: fields[4].parse().unwrap_or_else(|e| {
+                warn!("Failed to parse length on line {}: {}", line_num + 1, e);
+                errors_encountered += 1;
+                0
+            }),
             chromosome: fields[5].to_string(),
-            start: fields[6].parse().unwrap_or(0),
-            stop: fields[7].parse().unwrap_or(0),
+            start: fields[6].parse().unwrap_or_else(|e| {
+                warn!("Failed to parse start position on line {}: {}", line_num + 1, e);
+                errors_encountered += 1;
+                0
+            }),
+            stop: fields[7].parse().unwrap_or_else(|e| {
+                warn!("Failed to parse stop position on line {}: {}", line_num + 1, e);
+                errors_encountered += 1;
+                0
+            }),
             strand: fields[8].to_string(),
             blocks: fields[9].to_string(),
             start_codon: fields[10].to_string(),
-            phylo_csf_mean: fields[11].parse().unwrap_or(0.0),
+            phylo_csf_mean: fields[11].parse().unwrap_or_else(|e| {
+                warn!("Failed to parse phylo_csf_mean on line {}: {}", line_num + 1, e);
+                errors_encountered += 1;
+                0.0
+            }),
         };
 
         proteins.push(protein);
         lines_parsed += 1;
 
         if lines_parsed % 1000 == 0 {
+            trace!("Parsed {lines_parsed} lines");
             if let Some(ref callback) = progress_callback {
                 callback(DatasetProgress::Parsing { lines_parsed });
             }
         }
     }
 
+    if errors_encountered > 0 {
+        warn!("Parsing completed with {errors_encountered} errors encountered");
+    }
+
+    info!("Protein data parsing completed successfully. {} proteins loaded", proteins.len());
+    
     if let Some(ref callback) = progress_callback {
         callback(DatasetProgress::Complete);
     }

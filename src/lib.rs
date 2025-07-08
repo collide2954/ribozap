@@ -1,4 +1,5 @@
 pub mod app;
+pub mod logging;
 pub mod protein;
 pub mod sequence;
 pub mod ui;
