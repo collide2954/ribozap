@@ -1,9 +1,11 @@
 use ratatui::style::Color;
 use bio_seq::prelude::*;
 use bio_seq::translation::{TranslationTable, STANDARD};
-use crate::protein::{SmallProtein, download_and_parse_small_protein_dataset, calculate_dna_similarity, identify_matching_positions};
+use crate::protein::{SmallProtein, calculate_dna_similarity, identify_matching_positions, DatasetProgress};
 use crate::sequence::{get_complementary_base, dna_to_mrna};
 use std::collections::HashMap;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread;
 
 pub struct App {
     pub input: String,
@@ -17,6 +19,7 @@ pub struct App {
     pub is_loading_proteins: bool,
     pub loading_error: Option<String>,
     pub loaded_proteins_count: usize,
+    pub dataset_progress: Option<DatasetProgress>,
     pub is_positive_strand: bool,
     pub matching_positions: Vec<bool>,
     pub current_strand_confidence: f64,
@@ -33,6 +36,8 @@ pub struct App {
     pub multi_search_mode: bool,
     pub show_protein_detail: bool,
     pub detailed_protein: Option<SmallProtein>,
+    pub progress_receiver: Option<Receiver<DatasetProgress>>,
+    pub protein_receiver: Option<Receiver<Result<Vec<SmallProtein>, String>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -50,7 +55,7 @@ pub enum SearchField {
 
 impl App {
     pub fn new() -> App {
-        let mut app = App {
+        App {
             input: String::new(),
             complementary: String::new(),
             mrna: String::new(),
@@ -59,9 +64,10 @@ impl App {
             current_codon_position: 0,
             small_proteins: Vec::new(),
             closest_protein: None,
-            is_loading_proteins: false,
+            is_loading_proteins: true,
             loading_error: None,
             loaded_proteins_count: 0,
+            dataset_progress: Some(DatasetProgress::CheckingCache),
             is_positive_strand: true,
             matching_positions: Vec::new(),
             current_strand_confidence: 0.0,
@@ -78,19 +84,77 @@ impl App {
             multi_search_mode: false,
             show_protein_detail: false,
             detailed_protein: None,
-        };
+            progress_receiver: None,
+            protein_receiver: None,
+        }
+    }
 
-        match download_and_parse_small_protein_dataset() {
+    pub fn load_datasets(&mut self) {
+        use crate::protein::download_and_parse_small_protein_dataset_with_progress;
+        
+        self.is_loading_proteins = true;
+        self.loading_error = None;
+        self.dataset_progress = Some(DatasetProgress::CheckingCache);
+        
+        // Create a progress callback that updates the app state
+        // Note: This is a simplified version - in a real async implementation,
+        // you'd want to use channels or other mechanisms for thread-safe updates
+        match download_and_parse_small_protein_dataset_with_progress(None) {
             Ok(proteins) => {
-                app.loaded_proteins_count = proteins.len();
-                app.small_proteins = proteins;
+                self.loaded_proteins_count = proteins.len();
+                self.small_proteins = proteins;
+                self.is_loading_proteins = false;
+                self.dataset_progress = Some(DatasetProgress::Complete);
             },
             Err(e) => {
-                app.loading_error = Some(format!("Error loading proteins: {e}"));
+                self.loading_error = Some(format!("Error loading proteins: {e}"));
+                self.is_loading_proteins = false;
+                self.dataset_progress = Some(DatasetProgress::Error(e.to_string()));
             }
         }
+    }
 
-        app
+    pub fn update_progress(&mut self, progress: DatasetProgress) {
+        self.dataset_progress = Some(progress);
+    }
+
+    pub fn check_and_load_datasets(&mut self) -> bool {
+        // Check if datasets already exist
+        use crate::protein::dataset::get_data_dir;
+        if let Ok(data_dir) = get_data_dir() {
+            let extracted_file = data_dir.join("small_protein_dataset.txt");
+            if extracted_file.exists() {
+                // File exists, load it quickly
+                self.dataset_progress = Some(DatasetProgress::Parsing { lines_parsed: 0 });
+                self.load_datasets();
+                return true;
+            }
+        }
+        
+        // File doesn't exist, we need to download - simulate progress updates
+        self.dataset_progress = Some(DatasetProgress::CheckingCache);
+        false
+    }
+
+    pub fn start_loading_if_needed(&mut self) -> bool {
+        if self.is_loading_proteins && self.small_proteins.is_empty() && self.loading_error.is_none() {
+            // Check if datasets already exist to skip download
+            use crate::protein::dataset::get_data_dir;
+            if let Ok(data_dir) = get_data_dir() {
+                let extracted_file = data_dir.join("small_protein_dataset.txt");
+                if extracted_file.exists() {
+                    // File exists, load it quickly
+                    self.dataset_progress = Some(DatasetProgress::Parsing { lines_parsed: 0 });
+                    self.load_datasets();
+                    return true;
+                }
+            }
+            
+            // File doesn't exist, we need to download
+            self.dataset_progress = Some(DatasetProgress::CheckingCache);
+            return false; // Indicates we need to show loading screen
+        }
+        false
     }
 
     pub fn find_closest_protein(&mut self) {
@@ -497,6 +561,118 @@ impl App {
             SearchField::MaxLength => "Max Length",
             SearchField::MinPhyloCSF => "Min PhyloCSF",
             SearchField::MaxPhyloCSF => "Max PhyloCSF",
+        }
+    }
+
+    pub fn simulate_loading_step(&mut self) -> bool {
+        // Check if file already exists first
+        use crate::protein::dataset::get_data_dir;
+        if let Ok(data_dir) = get_data_dir() {
+            let extracted_file = data_dir.join("small_protein_dataset.txt");
+            if extracted_file.exists() {
+                // File exists, load directly without showing progress
+                self.load_datasets();
+                return true;
+            }
+        }
+
+        match &self.dataset_progress {
+            Some(DatasetProgress::CheckingCache) => {
+                // Move to downloading state
+                self.dataset_progress = Some(DatasetProgress::Downloading { 
+                    bytes_downloaded: 0, 
+                    total_bytes: Some(15_000_000) // Simulate ~15MB file
+                });
+                false // Continue loading
+            },
+            Some(DatasetProgress::Downloading { bytes_downloaded, total_bytes }) => {
+                let new_downloaded = bytes_downloaded + 2_000_000; // Simulate 2MB chunks
+                if let Some(total) = total_bytes {
+                    if new_downloaded >= *total {
+                        // Download complete, move to extracting (restart progress)
+                        self.dataset_progress = Some(DatasetProgress::Extracting);
+                    } else {
+                        // Continue downloading
+                        self.dataset_progress = Some(DatasetProgress::Downloading {
+                            bytes_downloaded: new_downloaded,
+                            total_bytes: *total_bytes,
+                        });
+                    }
+                }
+                false // Continue loading
+            },
+            Some(DatasetProgress::Extracting) => {
+                // Extraction complete, load the actual data
+                self.load_datasets();
+                true // Loading complete
+            },
+            _ => true // Already complete or error
+        }
+    }
+
+    pub fn start_threaded_loading(&mut self) {
+        if self.progress_receiver.is_some() || self.protein_receiver.is_some() {
+            return; // Already loading
+        }
+
+        // Create channels for progress and result communication
+        let (progress_tx, progress_rx) = mpsc::channel();
+        let (result_tx, result_rx) = mpsc::channel();
+
+        self.progress_receiver = Some(progress_rx);
+        self.protein_receiver = Some(result_rx);
+
+        // Spawn background thread for dataset loading
+        thread::spawn(move || {
+            use crate::protein::download_and_parse_small_protein_dataset_with_progress;
+
+            // Create progress callback that sends updates through channel
+            let progress_callback = Box::new(move |progress: DatasetProgress| {
+                let _ = progress_tx.send(progress);
+            });
+
+            // Load dataset with progress callback
+            let result = download_and_parse_small_protein_dataset_with_progress(Some(progress_callback));
+            
+            // Send final result
+            let final_result = match result {
+                Ok(proteins) => Ok(proteins),
+                Err(e) => Err(e.to_string()),
+            };
+            
+            let _ = result_tx.send(final_result);
+        });
+    }
+
+    pub fn check_loading_progress(&mut self) {
+        // Check for progress updates
+        if let Some(ref progress_rx) = self.progress_receiver {
+            while let Ok(progress) = progress_rx.try_recv() {
+                self.dataset_progress = Some(progress);
+            }
+        }
+
+        // Check for final result
+        if let Some(ref result_rx) = self.protein_receiver {
+            if let Ok(result) = result_rx.try_recv() {
+                match result {
+                    Ok(proteins) => {
+                        self.loaded_proteins_count = proteins.len();
+                        self.small_proteins = proteins;
+                        self.is_loading_proteins = false;
+                        self.dataset_progress = Some(DatasetProgress::Complete);
+                    },
+                    Err(e) => {
+                        self.loading_error = Some(format!("Error loading proteins: {e}"));
+                        self.is_loading_proteins = false;
+                        self.dataset_progress = Some(DatasetProgress::Error(e));
+                    }
+                }
+                
+                // Clear receivers as loading is complete
+                self.progress_receiver = None;
+                self.protein_receiver = None;
+            }
         }
     }
 }

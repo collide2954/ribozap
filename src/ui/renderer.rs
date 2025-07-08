@@ -2,12 +2,13 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph},
+    widgets::{Block, Borders, Paragraph, Gauge},
     Frame,
 };
 
 use crate::{
     App,
+    protein::DatasetProgress,
     sequence::{
         calculate_gc_content, calculate_at_content, calculate_purine_content,
         calculate_pyrimidine_content, count_total_codons, count_complete_incomplete_codons,
@@ -19,6 +20,12 @@ use crate::{
 };
 
 pub fn render_ui(f: &mut Frame, app: &App) {
+    // Show loading screen if datasets are being loaded
+    if app.is_loading_proteins {
+        render_loading_screen(f, app);
+        return;
+    }
+
     let main_horizontal_split = Layout::default()
         .direction(Direction::Horizontal)
         .margin(2)
@@ -392,6 +399,93 @@ fn render_status_bar(f: &mut Frame, app: &App, area: Rect) {
     ])])
     .block(Block::default().title("Status").borders(Borders::ALL));
     f.render_widget(status_widget, area);
+}
+
+fn render_loading_screen(f: &mut Frame, app: &App) {
+    let area = f.area();
+
+    // Center the loading dialog
+    let loading_area = Rect::new(
+        area.width / 4,
+        area.height / 3,
+        area.width / 2,
+        area.height / 3,
+    );
+
+    // Clear the background
+    f.render_widget(ratatui::widgets::Clear, loading_area);
+
+    // Main loading container
+    let loading_block = Block::default()
+        .title("Loading Dataset")
+        .borders(Borders::ALL)
+        .border_style(Style::default().fg(Color::Cyan));
+    f.render_widget(loading_block, loading_area);
+
+    let inner_area = Rect::new(
+        loading_area.x + 1,
+        loading_area.y + 1,
+        loading_area.width - 2,
+        loading_area.height - 2,
+    );
+
+    let loading_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Min(3),
+        ])
+        .split(inner_area);
+
+    // Status text
+    let (status_text, progress_ratio) = match &app.dataset_progress {
+        Some(DatasetProgress::CheckingCache) => ("Checking local cache...".to_string(), 0.1),
+        Some(DatasetProgress::Downloading { bytes_downloaded, total_bytes }) => {
+            if let Some(total) = total_bytes {
+                let ratio = (*bytes_downloaded as f64) / (*total as f64);
+                (format!("Downloading... {:.1} MB / {:.1} MB",
+                    *bytes_downloaded as f64 / 1_048_576.0,
+                    *total as f64 / 1_048_576.0), ratio * 0.7 + 0.1) // 10% to 80%
+            } else {
+                (format!("Downloading... {:.1} MB",
+                    *bytes_downloaded as f64 / 1_048_576.0), 0.4)
+            }
+        },
+        Some(DatasetProgress::Extracting) => ("Extracting compressed file...".to_string(), 1.0), // 100% for extracting
+        Some(DatasetProgress::Parsing { .. }) => ("Loading complete!".to_string(), 1.0), // Treat parsing as complete
+        Some(DatasetProgress::Complete) => ("Loading complete!".to_string(), 1.0),
+        Some(DatasetProgress::Error(err)) => (format!("Error: {err}"), 0.0),
+        None => ("Initializing...".to_string(), 0.0),
+    };
+
+    let status_widget = Paragraph::new(vec![Line::from(vec![
+        Span::styled(status_text, Style::default().fg(Color::White)),
+    ])])
+    .block(Block::default().borders(Borders::ALL).title("Status"));
+    f.render_widget(status_widget, loading_chunks[0]);
+
+    // Progress bar using ratatui's built-in Gauge
+    let progress_percentage = (progress_ratio * 100.0) as u16;
+    let gauge = Gauge::default()
+        .block(Block::default().borders(Borders::ALL).title("Progress"))
+        .gauge_style(Style::default().fg(Color::Green))
+        .percent(progress_percentage)
+        .label(format!("{progress_percentage}%"));
+    f.render_widget(gauge, loading_chunks[1]);
+
+    // Data location info
+    let data_dir = match crate::protein::dataset::get_data_dir() {
+        Ok(dir) => dir,
+        Err(_) => std::path::PathBuf::from("Unable to determine data directory"),
+    };
+    let location_text = format!("Data stored in: {}", data_dir.display());
+    let location_widget = Paragraph::new(vec![Line::from(vec![
+        Span::styled(location_text, Style::default().fg(Color::DarkGray)),
+    ])])
+    .block(Block::default().borders(Borders::ALL).title("Storage Location"))
+    .wrap(ratatui::widgets::Wrap { trim: true });
+    f.render_widget(location_widget, loading_chunks[2]);
 }
 
 fn render_protein_searcher(f: &mut Frame, app: &App) {

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fs::{self, File};
-use std::io::{self, BufRead, BufReader, Read};
-use std::path::{Path, PathBuf};
+use std::io::{BufRead, BufReader, Read, Write};
+use std::path::PathBuf;
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 
@@ -21,34 +21,80 @@ pub struct SmallProtein {
     pub phylo_csf_mean: f64,
 }
 
-fn get_data_dir() -> Result<PathBuf, Box<dyn Error>> {
+#[derive(Debug, Clone)]
+pub enum DatasetProgress {
+    CheckingCache,
+    Downloading { bytes_downloaded: u64, total_bytes: Option<u64> },
+    Extracting,
+    Parsing { lines_parsed: usize },
+    Complete,
+    Error(String),
+}
+
+pub fn get_data_dir() -> Result<PathBuf, Box<dyn Error>> {
     let data_dir = dirs::data_dir()
         .ok_or("Could not determine data directory")?
         .join("ribozap");
 
-    // Create the directory if it doesn't exist
     fs::create_dir_all(&data_dir)?;
 
     Ok(data_dir)
 }
 
 pub fn download_and_parse_small_protein_dataset() -> Result<Vec<SmallProtein>, Box<dyn Error>> {
+    download_and_parse_small_protein_dataset_with_progress(None)
+}
+
+pub fn download_and_parse_small_protein_dataset_with_progress(
+    progress_callback: Option<Box<dyn Fn(DatasetProgress)>>
+) -> Result<Vec<SmallProtein>, Box<dyn Error>> {
     let url = "http://bigdata.ibp.ac.cn/SmProt/datadownload/SmProt2_LiteratureMining.txt.gz";
 
     let data_dir = get_data_dir()?;
     let temp_file = data_dir.join("small_protein_dataset.txt.gz");
     let extracted_file = data_dir.join("small_protein_dataset.txt");
 
+    if let Some(ref callback) = progress_callback {
+        callback(DatasetProgress::CheckingCache);
+    }
+
     if !extracted_file.exists() {
         if !temp_file.exists() {
-            println!("Downloading small protein dataset to {:?}...", data_dir);
+            if let Some(ref callback) = progress_callback {
+                callback(DatasetProgress::Downloading { bytes_downloaded: 0, total_bytes: None });
+            }
+
             let client = Client::new();
             let mut response = client.get(url).send()?;
+
+            let total_size = response.content_length();
+            let mut downloaded = 0u64;
+
             let mut file = File::create(&temp_file)?;
-            io::copy(&mut response, &mut file)?;
+            let mut buffer = [0; 8192];
+
+            loop {
+                let bytes_read = response.read(&mut buffer)?;
+                if bytes_read == 0 {
+                    break;
+                }
+
+                file.write_all(&buffer[..bytes_read])?;
+                downloaded += bytes_read as u64;
+
+                if let Some(ref callback) = progress_callback {
+                    callback(DatasetProgress::Downloading {
+                        bytes_downloaded: downloaded,
+                        total_bytes: total_size,
+                    });
+                }
+            }
         }
 
-        println!("Extracting small protein dataset...");
+        if let Some(ref callback) = progress_callback {
+            callback(DatasetProgress::Extracting);
+        }
+
         let compressed_file = File::open(&temp_file)?;
         let decoder = GzDecoder::new(compressed_file);
         let mut reader = BufReader::new(decoder);
@@ -61,6 +107,7 @@ pub fn download_and_parse_small_protein_dataset() -> Result<Vec<SmallProtein>, B
     let file = File::open(&extracted_file)?;
     let reader = BufReader::new(file);
     let mut proteins = Vec::new();
+    let mut lines_parsed = 0;
 
     for line in reader.lines().skip(1) {
         let line = line?;
@@ -86,6 +133,17 @@ pub fn download_and_parse_small_protein_dataset() -> Result<Vec<SmallProtein>, B
         };
 
         proteins.push(protein);
+        lines_parsed += 1;
+
+        if lines_parsed % 1000 == 0 {
+            if let Some(ref callback) = progress_callback {
+                callback(DatasetProgress::Parsing { lines_parsed });
+            }
+        }
+    }
+
+    if let Some(ref callback) = progress_callback {
+        callback(DatasetProgress::Complete);
     }
 
     Ok(proteins)
