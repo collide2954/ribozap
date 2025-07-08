@@ -1,7 +1,7 @@
 use std::error::Error;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, BufRead, BufReader, Read};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use flate2::read::GzDecoder;
 use reqwest::blocking::Client;
 
@@ -21,31 +21,44 @@ pub struct SmallProtein {
     pub phylo_csf_mean: f64,
 }
 
+fn get_data_dir() -> Result<PathBuf, Box<dyn Error>> {
+    let data_dir = dirs::data_dir()
+        .ok_or("Could not determine data directory")?
+        .join("ribozap");
+
+    // Create the directory if it doesn't exist
+    fs::create_dir_all(&data_dir)?;
+
+    Ok(data_dir)
+}
+
 pub fn download_and_parse_small_protein_dataset() -> Result<Vec<SmallProtein>, Box<dyn Error>> {
     let url = "http://bigdata.ibp.ac.cn/SmProt/datadownload/SmProt2_LiteratureMining.txt.gz";
-    let temp_file = "small_protein_dataset.txt.gz";
-    let extracted_file = "small_protein_dataset.txt";
 
-    if !Path::new(extracted_file).exists() {
-        if !Path::new(temp_file).exists() {
-            println!("Downloading small protein dataset...");
+    let data_dir = get_data_dir()?;
+    let temp_file = data_dir.join("small_protein_dataset.txt.gz");
+    let extracted_file = data_dir.join("small_protein_dataset.txt");
+
+    if !extracted_file.exists() {
+        if !temp_file.exists() {
+            println!("Downloading small protein dataset to {:?}...", data_dir);
             let client = Client::new();
             let mut response = client.get(url).send()?;
-            let mut file = File::create(temp_file)?;
+            let mut file = File::create(&temp_file)?;
             io::copy(&mut response, &mut file)?;
         }
 
         println!("Extracting small protein dataset...");
-        let compressed_file = File::open(temp_file)?;
+        let compressed_file = File::open(&temp_file)?;
         let decoder = GzDecoder::new(compressed_file);
         let mut reader = BufReader::new(decoder);
         let mut extracted_content = String::new();
         reader.read_to_string(&mut extracted_content)?;
 
-        std::fs::write(extracted_file, extracted_content)?;
+        std::fs::write(&extracted_file, extracted_content)?;
     }
 
-    let file = File::open(extracted_file)?;
+    let file = File::open(&extracted_file)?;
     let reader = BufReader::new(file);
     let mut proteins = Vec::new();
 
