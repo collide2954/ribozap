@@ -203,30 +203,14 @@ pub fn download_and_parse_small_protein_dataset_with_progress(
             id: fields[1].to_string(),
             rna_seq: fields[2].to_string(),
             aa_seq: fields[3].to_string(),
-            length: fields[4].parse().unwrap_or_else(|e| {
-                warn!("Failed to parse length on line {}: {}", line_num + 1, e);
-                errors_encountered += 1;
-                0
-            }),
+            length: parse_usize_field(fields[4], line_num + 1, "length", &mut errors_encountered),
             chromosome: fields[5].to_string(),
-            start: fields[6].parse().unwrap_or_else(|e| {
-                warn!("Failed to parse start position on line {}: {}", line_num + 1, e);
-                errors_encountered += 1;
-                0
-            }),
-            stop: fields[7].parse().unwrap_or_else(|e| {
-                warn!("Failed to parse stop position on line {}: {}", line_num + 1, e);
-                errors_encountered += 1;
-                0
-            }),
+            start: parse_usize_field(fields[6], line_num + 1, "start", &mut errors_encountered),
+            stop: parse_usize_field(fields[7], line_num + 1, "stop", &mut errors_encountered),
             strand: fields[8].to_string(),
             blocks: fields[9].to_string(),
             start_codon: fields[10].to_string(),
-            phylo_csf_mean: fields[11].parse().unwrap_or_else(|e| {
-                warn!("Failed to parse phylo_csf_mean on line {}: {}", line_num + 1, e);
-                errors_encountered += 1;
-                0.0
-            }),
+            phylo_csf_mean: parse_float_field(fields[11], line_num + 1, "phylo_csf_mean", &mut errors_encountered),
         };
 
         proteins.push(protein);
@@ -251,4 +235,52 @@ pub fn download_and_parse_small_protein_dataset_with_progress(
     }
 
     Ok(proteins)
+}
+
+fn parse_float_field(field: &str, line_num: usize, field_name: &str, errors_encountered: &mut usize) -> f64 {
+    let trimmed = field.trim();
+
+    // Handle common invalid float values
+    match trimmed {
+        "" | "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." | "NaN" | "nan" => {
+            debug!("Line {}: {} is '{}', using default value 0.0", line_num, field_name, trimmed);
+            0.0
+        },
+        _ => {
+            trimmed.parse().unwrap_or_else(|e| {
+                // Only warn for truly unexpected parsing errors, not common placeholders
+                if !trimmed.is_empty() && !matches!(trimmed, "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." | "NaN" | "nan") {
+                    warn!("Line {}: Failed to parse {} '{}': {}", line_num, field_name, trimmed, e);
+                    *errors_encountered += 1;
+                } else {
+                    debug!("Line {}: {} is '{}', using default value 0.0", line_num, field_name, trimmed);
+                }
+                0.0
+            })
+        }
+    }
+}
+
+fn parse_usize_field(field: &str, line_num: usize, field_name: &str, errors_encountered: &mut usize) -> usize {
+    let trimmed = field.trim();
+
+    // Handle common invalid usize values
+    match trimmed {
+        "" | "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." => {
+            debug!("Line {}: {} is '{}', using default value 0", line_num, field_name, trimmed);
+            0
+        },
+        _ => {
+            trimmed.parse().unwrap_or_else(|e| {
+                // Only warn for truly unexpected parsing errors, not common placeholders
+                if !trimmed.is_empty() && !matches!(trimmed, "NA" | "NULL" | "null" | "N/A" | "n/a" | "-" | "." ) {
+                    warn!("Line {}: Failed to parse {} '{}': {}", line_num, field_name, trimmed, e);
+                    *errors_encountered += 1;
+                } else {
+                    debug!("Line {}: {} is '{}', using default value 0", line_num, field_name, trimmed);
+                }
+                0
+            })
+        }
+    }
 }
