@@ -24,9 +24,7 @@ pub fn translate_dna_to_amino(dna: &str) -> Result<String, String> {
     Err("Invalid DNA sequence".to_string())
 }
 
-pub fn translate_all_reading_frames(dna: &str) -> Result<Vec<String>, String> {
-    let mut translations = Vec::new();
-
+fn translate_frames_for_sequence(dna: &str, translations: &mut Vec<String>) {
     for offset in 0..3 {
         if offset < dna.len() {
             let frame_dna = &dna[offset..];
@@ -35,16 +33,17 @@ pub fn translate_all_reading_frames(dna: &str) -> Result<Vec<String>, String> {
             }
         }
     }
+}
 
+pub fn translate_all_reading_frames(dna: &str) -> Result<Vec<String>, String> {
+    let mut translations = Vec::new();
+
+    // Translate forward reading frames
+    translate_frames_for_sequence(dna, &mut translations);
+
+    // Translate reverse complement reading frames
     let revcomp = crate::sequence::conversion::get_reverse_complement(dna);
-    for offset in 0..3 {
-        if offset < revcomp.len() {
-            let frame_dna = &revcomp[offset..];
-            if let Ok(translation) = translate_dna_to_amino(frame_dna) {
-                translations.push(translation);
-            }
-        }
-    }
+    translate_frames_for_sequence(&revcomp, &mut translations);
 
     Ok(translations)
 }
