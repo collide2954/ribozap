@@ -475,10 +475,7 @@ fn render_loading_screen(f: &mut Frame, app: &App) {
     f.render_widget(gauge, loading_chunks[1]);
 
     // Data location info
-    let data_dir = match crate::protein::dataset::get_data_dir() {
-        Ok(dir) => dir,
-        Err(_) => std::path::PathBuf::from("Unable to determine data directory"),
-    };
+    let data_dir = crate::protein::dataset::get_data_dir().unwrap_or_else(|_| std::path::PathBuf::from("Unable to determine data directory"));
     let location_text = format!("Data stored in: {}", data_dir.display());
     let location_widget = Paragraph::new(vec![Line::from(vec![
         Span::styled(location_text, Style::default().fg(Color::DarkGray)),
