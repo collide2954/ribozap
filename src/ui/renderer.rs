@@ -378,7 +378,7 @@ fn render_protein_analysis(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Line::from(vec![
             Span::raw("Net Charge: "),
-            Span::styled((positive_charges as i32 - negative_charges as i32).to_string(), Style::default().fg(Color::White)),
+            Span::styled((positive_charges - negative_charges).to_string(), Style::default().fg(Color::White)),
         ]),
     ];
 
