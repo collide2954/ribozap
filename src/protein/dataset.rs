@@ -49,6 +49,7 @@ pub fn download_and_parse_small_protein_dataset() -> Result<Vec<SmallProtein>, B
     download_and_parse_small_protein_dataset_with_progress(None)
 }
 
+//noinspection HttpUrlsUsage
 pub fn download_and_parse_small_protein_dataset_with_progress(
     progress_callback: Option<Box<dyn Fn(DatasetProgress)>>
 ) -> Result<Vec<SmallProtein>, Box<dyn Error>> {
