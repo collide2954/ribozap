@@ -38,10 +38,8 @@ fn translate_frames_for_sequence(dna: &str, translations: &mut Vec<String>) {
 pub fn translate_all_reading_frames(dna: &str) -> Result<Vec<String>, String> {
     let mut translations = Vec::new();
 
-    // Translate forward reading frames
     translate_frames_for_sequence(dna, &mut translations);
 
-    // Translate reverse complement reading frames
     let revcomp = crate::sequence::conversion::get_reverse_complement(dna);
     translate_frames_for_sequence(&revcomp, &mut translations);
 
