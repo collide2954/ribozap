@@ -122,41 +122,27 @@ impl App {
         self.dataset_progress = Some(progress);
     }
 
-    pub fn check_and_load_datasets(&mut self) -> bool {
-        // Check if datasets already exist
+    fn check_and_load_dataset_file(&mut self) -> bool {
         use crate::protein::dataset::get_data_dir;
         if let Ok(data_dir) = get_data_dir() {
             let extracted_file = data_dir.join("small_protein_dataset.txt");
             if extracted_file.exists() {
-                // File exists, load it quickly
                 self.dataset_progress = Some(DatasetProgress::Parsing { lines_parsed: 0 });
                 self.load_datasets();
                 return true;
             }
         }
-        
-        // File doesn't exist, we need to download - simulate progress updates
         self.dataset_progress = Some(DatasetProgress::CheckingCache);
         false
     }
 
+    pub fn check_and_load_datasets(&mut self) -> bool {
+        self.check_and_load_dataset_file()
+    }
+
     pub fn start_loading_if_needed(&mut self) -> bool {
         if self.is_loading_proteins && self.small_proteins.is_empty() && self.loading_error.is_none() {
-            // Check if datasets already exist to skip download
-            use crate::protein::dataset::get_data_dir;
-            if let Ok(data_dir) = get_data_dir() {
-                let extracted_file = data_dir.join("small_protein_dataset.txt");
-                if extracted_file.exists() {
-                    // File exists, load it quickly
-                    self.dataset_progress = Some(DatasetProgress::Parsing { lines_parsed: 0 });
-                    self.load_datasets();
-                    return true;
-                }
-            }
-            
-            // File doesn't exist, we need to download
-            self.dataset_progress = Some(DatasetProgress::CheckingCache);
-            return false; // Indicates we need to show loading screen
+            return self.check_and_load_dataset_file();
         }
         false
     }
