@@ -3,6 +3,7 @@ pub mod matching;
 pub mod molecular_weights;
 
 pub use dataset::*;
+pub use dataset::DatasetProgress;
 pub use matching::*;
 pub use molecular_weights::*;
 
