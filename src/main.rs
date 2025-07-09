@@ -163,7 +163,7 @@ fn run_main_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mu
         terminal.draw(|f| render_ui(f, app))?;
 
         // Use a timeout for event reading to allow progress updates
-        if crossterm::event::poll(std::time::Duration::from_millis(100))? {
+        if event::poll(std::time::Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 debug!("Key event received: {key:?}");
                 match key.code {
@@ -213,21 +213,21 @@ fn run_main_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mu
     Ok(())
 }
 
-fn handle_protein_searcher_keys(key: &crossterm::event::KeyEvent, app: &mut App) -> Result<(), Box<dyn Error>> {
+fn handle_protein_searcher_keys(key: &event::KeyEvent, app: &mut App) -> Result<(), Box<dyn Error>> {
     match key.code {
-        KeyCode::Char('t') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+        KeyCode::Char('t') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
             debug!("Toggling multi-search mode");
             app.toggle_multi_search_mode();
         },
-        KeyCode::Char('a') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+        KeyCode::Char('a') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
             debug!("Adding current filter");
             app.add_current_filter();
         },
-        KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+        KeyCode::Char('c') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
             debug!("Clearing current filter");
             app.clear_current_filter();
         },
-        KeyCode::Char('x') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+        KeyCode::Char('x') if key.modifiers.contains(event::KeyModifiers::CONTROL) => {
             debug!("Clearing all filters");
             app.clear_all_filters();
         },

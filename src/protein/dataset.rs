@@ -160,7 +160,7 @@ pub fn download_and_parse_small_protein_dataset_with_progress(
 
         debug!("Decompressed content size: {} bytes", extracted_content.len());
 
-        std::fs::write(&extracted_file, extracted_content)
+        fs::write(&extracted_file, extracted_content)
             .map_err(|e| {
                 error!("Failed to write extracted file {extracted_file:?}: {e}");
                 e
