@@ -9,15 +9,58 @@ use ratatui::{
 use crate::{
     App,
     protein::DatasetProgress,
-    sequence::{
-        calculate_gc_content, calculate_at_content, calculate_purine_content,
-        calculate_pyrimidine_content, count_total_codons, count_complete_incomplete_codons,
-        count_start_codons, count_stop_codons, calculate_amino_acid_length,
-        estimate_molecular_weight, calculate_hydrophobicity_index,
-        count_charged_residues, count_orfs,
-    },
+    sequence::*,
     ui::{format_triplets, create_codon_completion_display},
 };
+
+// Helper functions to eliminate code duplication
+fn create_conditional_style(condition: bool, true_color: Color, false_color: Color) -> Style {
+    if condition {
+        Style::default().fg(true_color)
+    } else {
+        Style::default().fg(false_color)
+    }
+}
+
+fn create_selection_style(is_selected: bool) -> Style {
+    if is_selected {
+        Style::default().fg(Color::Black).bg(Color::Yellow)
+    } else {
+        Style::default().fg(Color::White)
+    }
+}
+
+fn create_match_style(is_match: bool) -> Style {
+    if is_match {
+        Style::default().fg(Color::Green).bg(Color::DarkGray)
+    } else {
+        Style::default().fg(Color::Cyan)
+    }
+}
+
+fn create_labeled_span(label: &str, value: String, color: Color) -> Vec<Span<'_>> {
+    vec![
+        Span::raw(label.to_string()),
+        Span::styled(value, Style::default().fg(color)),
+    ]
+}
+
+fn create_strand_mode_spans(is_positive_strand: bool) -> Vec<Span<'static>> {
+    vec![
+        Span::raw("Strand: "),
+        Span::styled("[+] Positive", create_conditional_style(is_positive_strand, Color::Green, Color::DarkGray)),
+        Span::raw(" / "),
+        Span::styled("[-] Negative", create_conditional_style(!is_positive_strand, Color::Yellow, Color::DarkGray)),
+    ]
+}
+
+fn create_help_widget(help_lines: Vec<Line>) -> Paragraph {
+    Paragraph::new(help_lines)
+        .block(Block::default()
+            .title("Help")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan)))
+}
 
 pub fn render_ui(f: &mut Frame, app: &App) {
     // Show loading screen if datasets are being loaded
@@ -73,23 +116,7 @@ fn render_title(f: &mut Frame, app: &App, area: Rect) {
         Span::raw("   "),
     ];
 
-    let strand_mode_spans = if app.is_positive_strand {
-        vec![
-            Span::raw("Strand: "),
-            Span::styled("[+] Positive", Style::default().fg(Color::Green)),
-            Span::raw(" / "),
-            Span::styled("[-] Negative", Style::default().fg(Color::DarkGray)),
-        ]
-    } else {
-        vec![
-            Span::raw("Strand: "),
-            Span::styled("[+] Positive", Style::default().fg(Color::DarkGray)),
-            Span::raw(" / "),
-            Span::styled("[-] Negative", Style::default().fg(Color::Yellow)),
-        ]
-    };
-
-    spans.extend(strand_mode_spans);
+    spans.extend(create_strand_mode_spans(app.is_positive_strand));
 
     let title_widget = Paragraph::new(vec![Line::from(spans)])
         .block(Block::default().borders(Borders::ALL));
@@ -193,11 +220,7 @@ fn build_protein_info_lines(protein: &crate::SmallProtein, matching_positions: &
 
     for (i, c) in protein.rna_seq.chars().enumerate() {
         let is_match = i < matching_positions.len() && matching_positions[i];
-        let style = if is_match {
-            Style::default().fg(Color::Green).bg(Color::DarkGray)
-        } else {
-            Style::default().fg(Color::Cyan)
-        };
+        let style = create_match_style(is_match);
 
         rna_seq_spans.push(Span::styled(c.to_string(), style));
 
@@ -209,55 +232,22 @@ fn build_protein_info_lines(protein: &crate::SmallProtein, matching_positions: &
     }
 
     vec![
-        Line::from(vec![
-            Span::raw("Species: "),
-            Span::styled(protein.species.clone(), Style::default().fg(Color::Green)),
-        ]),
-        Line::from(vec![
-            Span::raw("ID: "),
-            Span::styled(protein.id.clone(), Style::default().fg(Color::Yellow)),
-        ]),
-        Line::from(vec![
-            Span::raw("Length: "),
-            Span::styled(protein.length.to_string(), Style::default().fg(Color::Blue)),
-        ]),
-        Line::from(vec![
-            Span::raw("Chromosome: "),
-            Span::styled(protein.chromosome.clone(), Style::default().fg(Color::Cyan)),
-        ]),
-        Line::from(vec![
-            Span::raw("Start: "),
-            Span::styled(protein.start.to_string(), Style::default().fg(Color::Green)),
-        ]),
-        Line::from(vec![
-            Span::raw("Stop: "),
-            Span::styled(protein.stop.to_string(), Style::default().fg(Color::Yellow)),
-        ]),
-        Line::from(vec![
-            Span::raw("Strand: "),
-            Span::styled(protein.strand.clone(), Style::default().fg(Color::Blue)),
-        ]),
-        Line::from(vec![
-            Span::raw("Blocks: "),
-            Span::styled(protein.blocks.clone(), Style::default().fg(Color::Cyan)),
-        ]),
-        Line::from(vec![
-            Span::raw("Start Codon: "),
-            Span::styled(protein.start_codon.clone(), Style::default().fg(Color::Green)),
-        ]),
-        Line::from(vec![
-            Span::raw("PhyloCSF Mean: "),
-            Span::styled(protein.phylo_csf_mean.to_string(), Style::default().fg(Color::Yellow)),
-        ]),
+        Line::from(create_labeled_span("Species: ", protein.species.clone(), Color::Green)),
+        Line::from(create_labeled_span("ID: ", protein.id.clone(), Color::Yellow)),
+        Line::from(create_labeled_span("Length: ", protein.length.to_string(), Color::Blue)),
+        Line::from(create_labeled_span("Chromosome: ", protein.chromosome.clone(), Color::Cyan)),
+        Line::from(create_labeled_span("Start: ", protein.start.to_string(), Color::Green)),
+        Line::from(create_labeled_span("Stop: ", protein.stop.to_string(), Color::Yellow)),
+        Line::from(create_labeled_span("Strand: ", protein.strand.clone(), Color::Blue)),
+        Line::from(create_labeled_span("Blocks: ", protein.blocks.clone(), Color::Cyan)),
+        Line::from(create_labeled_span("Start Codon: ", protein.start_codon.clone(), Color::Green)),
+        Line::from(create_labeled_span("PhyloCSF Mean: ", protein.phylo_csf_mean.to_string(), Color::Yellow)),
         Line::from({
             let mut spans = vec![Span::raw("RNA Seq: ")];
             spans.extend(rna_seq_spans);
             spans
         }),
-        Line::from(vec![
-            Span::raw("AA Seq: "),
-            Span::styled(protein.aa_seq.clone(), Style::default().fg(Color::Magenta)),
-        ]),
+        Line::from(create_labeled_span("AA Seq: ", protein.aa_seq.clone(), Color::Magenta)),
     ]
 }
 
@@ -534,13 +524,7 @@ fn render_protein_searcher(f: &mut Frame, app: &App) {
     };
 
     let field_selector = Paragraph::new(vec![Line::from(vec![
-        Span::styled(mode_text,
-            if app.multi_search_mode {
-                Style::default().fg(Color::Green)
-            } else {
-                Style::default().fg(Color::Yellow)
-            }
-        ),
+        Span::styled(mode_text, create_conditional_style(app.multi_search_mode, Color::Green, Color::Yellow)),
         Span::raw(" (Tab/Shift+Tab to change, Ctrl+T to toggle mode)"),
     ])])
     .block(Block::default()
@@ -595,16 +579,10 @@ fn render_protein_searcher(f: &mut Frame, app: &App) {
 
     let results_lines: Vec<Line> = app.filtered_proteins.iter().enumerate().map(|(i, protein)| {
         let is_selected = i == app.selected_protein_index;
-        let style = if is_selected {
-            Style::default().fg(Color::Black).bg(Color::Yellow)
-        } else {
-            Style::default().fg(Color::White)
-        };
-
         Line::from(vec![
             Span::styled(
                 format!("{}: {} ({})", protein.id, protein.species, protein.length),
-                style,
+                create_selection_style(is_selected),
             ),
         ])
     }).collect();
@@ -696,12 +674,8 @@ fn render_protein_searcher(f: &mut Frame, app: &App) {
         ]
     };
 
-    let help_text = Paragraph::new(help_lines)
-        .block(Block::default()
-            .title("Help")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan)));
-    f.render_widget(help_text, searcher_chunks[5]);
+    let help_widget = create_help_widget(help_lines);
+    f.render_widget(help_widget, searcher_chunks[5]);
 }
 
 fn render_protein_detail(f: &mut Frame, app: &App) {
@@ -824,10 +798,6 @@ fn render_protein_detail(f: &mut Frame, app: &App) {
         ]),
     ];
 
-    let help_text = Paragraph::new(help_lines)
-        .block(Block::default()
-            .title("Help")
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(Color::Cyan)));
-    f.render_widget(help_text, detail_chunks[2]);
+    let help_widget = create_help_widget(help_lines);
+    f.render_widget(help_widget, detail_chunks[2]);
 }
