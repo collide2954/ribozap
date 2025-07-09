@@ -2,8 +2,7 @@ use ratatui::{
     style::{Color, Style},
     text::{Line, Span},
 };
-use bio_seq::prelude::*;
-use bio_seq::translation::{TranslationTable, STANDARD};
+use crate::sequence::dna_codon_to_amino_acid;
 
 pub fn format_triplets(sequence: &str) -> String {
     let mut result = String::new();
@@ -71,12 +70,8 @@ pub fn create_codon_completion_display(partial_codon: &str) -> Vec<Line<'static>
                 let mut possible_aminos = Vec::new();
                 for &third_base in &nucleotides {
                     let codon = format!("{first_base}{second_base}{third_base}");
-                    if let Ok(codon_seq) = codon.parse::<Seq<Dna>>() {
-                        if codon_seq.len() == 3 {
-                            let amino = STANDARD.to_amino(&codon_seq);
-                            possible_aminos.push(amino.to_string());
-                        }
-                    }
+                    let amino = dna_codon_to_amino_acid(&codon);
+                    possible_aminos.push(amino);
                 }
 
                 possible_aminos.sort();
@@ -107,15 +102,7 @@ pub fn create_codon_completion_display(partial_codon: &str) -> Vec<Line<'static>
                 let codon = format!("{first_base}{second_base}{third_base}");
                 let display_third = if third_base == 'T' { 'U' } else { third_base };
 
-                let amino = if let Ok(codon_seq) = codon.parse::<Seq<Dna>>() {
-                    if codon_seq.len() == 3 {
-                        STANDARD.to_amino(&codon_seq).to_string()
-                    } else {
-                        "?".to_string()
-                    }
-                } else {
-                    "?".to_string()
-                };
+                let amino = dna_codon_to_amino_acid(&codon);
 
                 lines.push(Line::from(vec![
                     Span::styled(format!("{display_first}{display_second}{display_third} → "), Style::default().fg(Color::Cyan)),

@@ -1,8 +1,6 @@
 use ratatui::style::Color;
-use bio_seq::prelude::*;
-use bio_seq::translation::{TranslationTable, STANDARD};
 use crate::protein::{SmallProtein, calculate_dna_similarity, identify_matching_positions, DatasetProgress};
-use crate::sequence::{get_complementary_base, dna_to_mrna};
+use crate::sequence::{get_complementary_base, dna_to_mrna, dna_codon_to_amino_acid};
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
@@ -301,15 +299,7 @@ impl App {
             let codon = &mrna_str[i..i+3];
             let dna_codon = codon.replace('U', "T");
 
-            let amino = if let Ok(codon_seq) = dna_codon.parse::<Seq<Dna>>() {
-                if codon_seq.len() == 3 {
-                    STANDARD.to_amino(&codon_seq).to_string()
-                } else {
-                    "?".to_string()
-                }
-            } else {
-                "?".to_string()
-            };
+            let amino = dna_codon_to_amino_acid(&dna_codon);
             let color = Color::White;
 
             if !self.amino_acids.is_empty() {

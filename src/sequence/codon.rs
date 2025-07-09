@@ -1,3 +1,18 @@
+use bio_seq::prelude::*;
+use bio_seq::translation::{TranslationTable, STANDARD};
+
+pub fn dna_codon_to_amino_acid(codon: &str) -> String {
+    if let Ok(codon_seq) = codon.parse::<Seq<Dna>>() {
+        if codon_seq.len() == 3 {
+            STANDARD.to_amino(&codon_seq).to_string()
+        } else {
+            "?".to_string()
+        }
+    } else {
+        "?".to_string()
+    }
+}
+
 pub fn count_total_codons(dna: &str) -> usize {
     dna.len() / 3
 }
